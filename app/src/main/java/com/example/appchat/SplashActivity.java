@@ -1,6 +1,5 @@
 package com.example.appchat;
 
-import android.annotation.SuppressLint;
 import android.content.Intent;
 import android.os.Bundle;
 import android.os.Handler;
@@ -14,11 +13,13 @@ public class SplashActivity extends AppCompatActivity {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_splash);
 
-        // Chờ 2 giây rồi chuyển sang MainActivity
-        new Handler().postDelayed(() -> {
-            Intent intent = new Intent(SplashActivity.this, MainActivity.class);
-            startActivity(intent);
-            finish();
-        }, 2000);
+        // Chờ 3 giây rồi chuyển sang LoginPhoneNumberActivity
+        new Handler().postDelayed(new Runnable() {
+            @Override
+            public void run() {
+                startActivity(new Intent(SplashActivity.this, LoginPhoneNumberActivity.class));
+                finish();
+            }
+        }, 3000); // đúng vị trí dấu đóng
     }
 }
