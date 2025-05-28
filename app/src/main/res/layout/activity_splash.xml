@@ -8,11 +8,14 @@
     android:background="@color/my_primary"
     tools:context=".SplashActivity">
 
+    <!-- Nội dung chính: icon + tên app + progress -->
     <LinearLayout
+        android:id="@+id/center_content"
         android:layout_width="match_parent"
-        android:layout_height="match_parent"
-        android:gravity="center"
-        android:orientation="vertical">
+        android:layout_height="wrap_content"
+        android:layout_centerInParent="true"
+        android:orientation="vertical"
+        android:gravity="center_horizontal">
 
         <ImageView
             android:layout_width="160dp"
@@ -36,14 +39,14 @@
             android:layout_marginTop="20dp" />
     </LinearLayout>
 
+    <!-- Dòng chữ ở cuối -->
     <TextView
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
         android:text="Developed by TeamNLU"
-        android:textSize="20sp"
+        android:textSize="18sp"
         android:textColor="@color/off_white"
         android:layout_alignParentBottom="true"
-        android:layout_centerHorizontal="true"
         android:gravity="center"
         android:layout_marginBottom="16dp" />
 </RelativeLayout>
