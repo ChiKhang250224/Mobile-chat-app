@@ -12,7 +12,6 @@ import android.widget.ProgressBar;
 import com.hbb20.CountryCodePicker;
 
 public class LoginPhoneNumberActivity extends AppCompatActivity {
-
     private CountryCodePicker countryCodePicker;
     private EditText phoneInput;
     private Button sendOtpBtn;
@@ -47,9 +46,9 @@ public class LoginPhoneNumberActivity extends AppCompatActivity {
             sendOtpBtn.setEnabled(false);
 
             // Chuyển sang màn hình OTP
-            // intent = new Intent(LoginPhoneNumberActivity.this, LoginOtpActivity.class);
-            //intent.putExtra("phone", fullPhoneNumber);
-            //startActivity(intent);
+            Intent intent = new Intent(LoginPhoneNumberActivity.this, LoginOTPActivity.class);
+            intent.putExtra("phone", fullPhoneNumber);
+            startActivity(intent);
 
             // Ẩn progress sau khi chuyển màn hình (tuỳ theo logic bạn có thể để bên LoginOtp xử lý lại sau)
             progressBar.setVisibility(View.GONE);
