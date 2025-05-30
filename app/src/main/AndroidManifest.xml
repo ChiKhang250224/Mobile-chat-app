@@ -12,6 +12,9 @@
         android:theme="@style/Theme.EasyChat"
         tools:targetApi="31">
         <activity
+            android:name=".SearchUserActivity"
+            android:exported="false" />
+        <activity
             android:name=".LoginUserNameActivity"
             android:exported="false" />
         <activity
