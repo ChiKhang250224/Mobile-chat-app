@@ -51,6 +51,8 @@ dependencies {
     implementation ("com.google.firebase:firebase-firestore")
     implementation ("com.github.bumptech.glide:glide:4.15.1")
     annotationProcessor ("com.github.bumptech.glide:compiler:4.15.1")
+    implementation ("com.google.firebase:firebase-messaging-ktx:23.1.2")
+    implementation ("com.github.dhaval2404:imagepicker:2.1")
 
 
 }
