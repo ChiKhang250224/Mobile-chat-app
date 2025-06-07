@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <item name="profile_pic_image_view" type="id" />
+    <item name="left_chat_layout" type="id" />
+    <item name="right_chat_layout" type="id" />
+    <item name="left_chat_textview" type="id" />
+    <item name="right_chat_textview" type="id" />
+</resources>

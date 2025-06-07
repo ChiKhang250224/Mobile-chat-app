@@ -47,5 +47,10 @@ dependencies {
     implementation("com.google.firebase:firebase-auth")
     implementation ("com.google.firebase:firebase-firestore:24.9.1")
     implementation("com.hbb20:ccp:2.5.0")
+    implementation ("com.firebaseui:firebase-ui-firestore:8.0.2")
+    implementation ("com.google.firebase:firebase-firestore")
+    implementation ("com.github.bumptech.glide:glide:4.15.1")
+    annotationProcessor ("com.github.bumptech.glide:compiler:4.15.1")
+
 
 }
