@@ -16,7 +16,7 @@ import java.util.List;
 // Lớp tiện ích để xử lý các thao tác liên quan đến Firebase
 public class FirebaseUtil {
 
-    // Lấy ID của người dùng hiện tại
+    // Lấy ID của người dùng hiện tạiC
     public static String currentUserId() {
         return FirebaseAuth.getInstance().getUid(); // Trả về UID từ Firebase Authentication
     }

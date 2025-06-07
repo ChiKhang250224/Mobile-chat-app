@@ -14,6 +14,7 @@ import android.widget.EditText;
 import android.widget.ImageButton;
 import android.widget.ImageView;
 import android.widget.TextView;
+import android.widget.Toast;
 
 import com.example.appchat.adapter.ChatRecyclerAdapter;
 import com.example.appchat.adapter.SearchUserRecyclerAdapter;
@@ -23,6 +24,7 @@ import com.example.appchat.model.UserModel;
 import com.example.appchat.utils.AndroidUtils;
 import com.example.appchat.utils.FirebaseUtil;
 import com.firebase.ui.firestore.FirestoreRecyclerOptions;
+import com.google.android.gms.common.api.Response;
 import com.google.android.gms.tasks.OnCompleteListener;
 import com.google.android.gms.tasks.Task;
 import com.google.firebase.Timestamp;
@@ -30,7 +32,18 @@ import com.google.firebase.firestore.DocumentReference;
 import com.google.firebase.firestore.DocumentSnapshot;
 import com.google.firebase.firestore.Query;
 
+import org.json.JSONObject;
+
+import java.io.IOException;
 import java.util.Arrays;
+
+
+import okhttp3.Call;
+import okhttp3.MediaType;
+import okhttp3.OkHttpClient;
+import okhttp3.RequestBody;
+import okhttp3.Request;
+import okhttp3.Callback;
 
 public class ChatActivity extends AppCompatActivity {
 
@@ -69,6 +82,14 @@ public class ChatActivity extends AppCompatActivity {
         otherUsername = findViewById(R.id.other_username);
         recyclerView = findViewById(R.id.chat_recycler_view);
         imageView = findViewById(R.id.profile_pic_image_view);
+
+        FirebaseUtil.getOtherProfilePicStorageRef(otherUser.getUserId()).getDownloadUrl()
+                .addOnCompleteListener(t -> {
+                    if(t.isSuccessful()){
+                        Uri uri  = t.getResult();
+                        AndroidUtils.setProfilePic(this,uri,imageView);
+                    }
+                });
 
         // Xử lý sự kiện nhấn nút quay lại
         backBtn.setOnClickListener((v) -> {
@@ -126,29 +147,31 @@ public class ChatActivity extends AppCompatActivity {
         });
     }
 
-    // Hàm gửi tin nhắn đến người dùng khác
     void sendMessageToUser(String message) {
-        // Cập nhật thông tin phòng chat (thời gian, người gửi, nội dung tin nhắn cuối)
+        // Cập nhật thông tin phòng chat
         chatroomModel.setLastMessageTimestamp(Timestamp.now());
         chatroomModel.setLastMessageSenderId(FirebaseUtil.currentUserId());
         chatroomModel.setLastMessage(message);
-        // Lưu phòng chat vào Firestore
-        FirebaseUtil.getChatroomReference(chatroomId).set(chatroomModel);
 
-        // Tạo đối tượng tin nhắn mới
+        FirebaseUtil.getChatroomReference(chatroomId).set(chatroomModel)
+                .addOnFailureListener(e -> Log.e("FIRESTORE", "Lỗi cập nhật chatroom", e));
+
+        // Tạo tin nhắn mới
         ChatMessageModel chatMessageModel = new ChatMessageModel(message, FirebaseUtil.currentUserId(), Timestamp.now());
-        // Thêm tin nhắn vào Firestore
-        FirebaseUtil.getChatroomMessageReference(chatroomId).add(chatMessageModel)
-                .addOnCompleteListener(new OnCompleteListener<DocumentReference>() {
-                    @Override
-                    public void onComplete(@NonNull Task<DocumentReference> task) {
-                        if (task.isSuccessful()) {
-                            // Xóa nội dung ô nhập sau khi gửi thành công
-                            messageInput.setText("");
-                        }
-                    }
+
+        FirebaseUtil.getChatroomMessageReference(chatroomId)
+                .add(chatMessageModel)
+                .addOnSuccessListener(docRef -> {
+                    messageInput.setText("");
+                    sendNotification(message);
+                    Log.d("SEND_MSG", "Gửi thành công");
+                })
+                .addOnFailureListener(e -> {
+                    Log.e("SEND_MSG", "Lỗi khi gửi tin nhắn", e);
+                    Toast.makeText(ChatActivity.this, "Không gửi được tin nhắn", Toast.LENGTH_SHORT).show();
                 });
     }
+
 
     // Hàm lấy hoặc tạo mới phòng chat trong Firestore
     void getOrCreateChatroomModel() {
@@ -171,4 +194,63 @@ public class ChatActivity extends AppCompatActivity {
             }
         });
     }
+    void sendNotification(String message){
+
+        FirebaseUtil.currentUserDetails().get().addOnCompleteListener(task -> {
+            if(task.isSuccessful()){
+                UserModel currentUser = task.getResult().toObject(UserModel.class);
+                try{
+                    JSONObject jsonObject  = new JSONObject();
+
+                    JSONObject notificationObj = new JSONObject();
+                    notificationObj.put("title",currentUser.getUsername());
+                    notificationObj.put("body",message);
+
+                    JSONObject dataObj = new JSONObject();
+                    dataObj.put("userId",currentUser.getUserId());
+
+                    jsonObject.put("notification",notificationObj);
+                    jsonObject.put("data",dataObj);
+                    jsonObject.put("to",otherUser.getFcmToken());
+
+                    callApi(jsonObject);
+
+
+                }catch (Exception e){
+
+                }
+
+            }
+        });
+
+    }
+
+    void callApi(JSONObject jsonObject){
+        MediaType JSON = MediaType.get("application/json; charset=utf-8");
+        OkHttpClient client = new OkHttpClient();
+        String url = "https://fcm.googleapis.com/fcm/send";
+        RequestBody body = RequestBody.create(jsonObject.toString(),JSON);
+        Request request = new Request.Builder()
+                .url(url)
+                .post(body)
+                .header("Authorization","Bearer YOUR_API_KEY")
+                .build();
+        client.newCall(request).enqueue(new Callback() {
+            @Override
+            public void onFailure(@NonNull Call call, @NonNull IOException e) {
+                Log.e("NOTIFY_API", "Gửi thông báo thất bại", e);
+            }
+            @Override
+            public void onResponse(@NonNull okhttp3.Call call, @NonNull okhttp3.Response response) throws IOException {
+                Log.d("NOTIFY_API", "Gửi thông báo thành công");
+
+            }
+        });
+
+    }
+
+
+
+
+
 }
