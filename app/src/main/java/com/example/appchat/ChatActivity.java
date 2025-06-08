@@ -10,6 +10,7 @@ import androidx.recyclerview.widget.RecyclerView;
 import android.net.Uri;
 import android.os.Bundle;
 import android.util.Log;
+import android.view.View;
 import android.widget.EditText;
 import android.widget.ImageButton;
 import android.widget.ImageView;
@@ -70,37 +71,74 @@ public class ChatActivity extends AppCompatActivity {
         // Liên kết Activity với file layout activity_chat.xml
         setContentView(R.layout.activity_chat);
 
-        // Lấy thông tin người dùng khác từ Intent
-        otherUser = AndroidUtils.getUserModelFromIntent(getIntent());
-        // Tạo ID phòng chat dựa trên ID của người dùng hiện tại và người dùng khác
-        chatroomId = FirebaseUtil.getChatroomId(FirebaseUtil.currentUserId(), otherUser.getUserId());
-
         // Gán các thành phần giao diện từ layout
         messageInput = findViewById(R.id.chat_message_input);
         sendMessageBtn = findViewById(R.id.message_send_btn);
         backBtn = findViewById(R.id.back_btn);
-        otherUsername = findViewById(R.id.other_username);
+        otherUsername = findViewById(R.id.other_username); // 👈 Cần gọi findViewById trước khi setText
         recyclerView = findViewById(R.id.chat_recycler_view);
         imageView = findViewById(R.id.profile_pic_image_view);
+        TextView onlineStatus = findViewById(R.id.online_status);
 
+        // Lấy thông tin người dùng khác từ Intent
+        otherUser = AndroidUtils.getUserModelFromIntent(getIntent());
+
+        //
+        if (otherUser != null && otherUser.getUsername() != null) {
+            otherUsername.setText(otherUser.getUsername());
+        } else {
+            otherUsername.setText("Unknown");
+        }
+        //
+
+        // Tạo ID phòng chat dựa trên ID của người dùng hiện tại và người dùng khác
+        chatroomId = FirebaseUtil.getChatroomId(FirebaseUtil.currentUserId(), otherUser.getUserId());
+
+        // Tải ảnh đại diện của người kia
         FirebaseUtil.getOtherProfilePicStorageRef(otherUser.getUserId()).getDownloadUrl()
                 .addOnCompleteListener(t -> {
-                    if(t.isSuccessful()){
-                        Uri uri  = t.getResult();
-                        AndroidUtils.setProfilePic(this,uri,imageView);
+                    if (t.isSuccessful()) {
+                        Uri uri = t.getResult();
+                        AndroidUtils.setProfilePic(this, uri, imageView);
                     }
                 });
 
         // Xử lý sự kiện nhấn nút quay lại
         backBtn.setOnClickListener((v) -> {
-            // Quay lại Activity trước đó
             onBackPressed();
         });
 
-        // Hiển thị tên người dùng khác
-        otherUsername.setText(otherUser.getUsername());
+        // Hiển thị trạng thái online hoặc last seen
+        FirebaseUtil.allUserCollectionReference()
+                .document(otherUser.getUserId())
+                .addSnapshotListener((snapshot, error) -> {
+                    if (snapshot != null && snapshot.exists()) {
+                        boolean isOnline = snapshot.getBoolean("online") != null && snapshot.getBoolean("online");
+                        if (isOnline) {
+                            onlineStatus.setText("Online");
+                            onlineStatus.setTextColor(getResources().getColor(R.color.light_green));
+                            onlineStatus.setCompoundDrawablesWithIntrinsicBounds(R.drawable.icon_dot_green, 0, 0, 0);
+                            onlineStatus.setVisibility(View.VISIBLE);
+                        } else {
+                            Timestamp lastSeen = snapshot.getTimestamp("lastSeen");
+                            if (lastSeen != null) {
+                                String time = FirebaseUtil.timestampToString(lastSeen);
+                                onlineStatus.setText("Last seen: " + time);
+                                onlineStatus.setTextColor(getResources().getColor(R.color.gray));
+                                onlineStatus.setCompoundDrawablesWithIntrinsicBounds(R.drawable.icon_clock_gray, 0, 0, 0);
+                                onlineStatus.setVisibility(View.VISIBLE);
+                            } else {
+                                onlineStatus.setVisibility(View.GONE);
+                            }
+                        }
+                    }
+                });
 
-        // Xử lý sự kiện nhấn nút gửi tin nhắn
+
+
+
+
+    // Xử lý sự kiện nhấn nút gửi tin nhắn
         sendMessageBtn.setOnClickListener((v -> {
             // Lấy nội dung tin nhắn và xóa khoảng trắng thừa
             String message = messageInput.getText().toString().trim();

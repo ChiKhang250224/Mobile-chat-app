@@ -8,6 +8,9 @@ public class UserModel {
     private Timestamp createdTimestamp;
     private String userId;
     private String fcmToken;
+    private boolean online;
+    private Timestamp lastSeen;
+
     public UserModel() {
     }
     public UserModel(String phone, String username, Timestamp createdTimestamp, String userId) {
@@ -54,5 +57,20 @@ public class UserModel {
 
     public void setUserId(String userId) {
         this.userId = userId;
+    }
+    public boolean isOnline() {
+        return online;
+    }
+
+    public void setOnline(boolean online) {
+        this.online = online;
+    }
+
+    public Timestamp getLastSeen() {
+        return lastSeen;
+    }
+
+    public void setLastSeen(Timestamp lastSeen) {
+        this.lastSeen = lastSeen;
     }
 }

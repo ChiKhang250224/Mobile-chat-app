@@ -6,60 +6,84 @@
     android:layout_height="match_parent"
     tools:context=".ChatActivity">
 
+    <!-- Toolbar (Header) -->
     <RelativeLayout
+        android:id="@+id/toolbar"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
         android:background="@color/my_primary"
-        android:padding="10dp"
-        android:id="@+id/toolbar">
+        android:padding="10dp">
 
-        <TextView
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:text="Username"
-            android:textSize="22sp"
-            android:textStyle="bold"
-            android:textColor="@color/white"
-            android:layout_marginStart="10dp"
-            android:layout_centerVertical="true"
-            android:layout_toRightOf="@id/profile_pic_layout"
-            android:id="@+id/other_username"
-            />
-
-        <include layout="@layout/profile_pic_view"
-            android:layout_width="48dp"
-            android:layout_height="48dp"
-            android:layout_marginStart="10dp"
-            android:layout_toRightOf="@id/back_btn"
-            android:id="@+id/profile_pic_layout"
-            />
-
+        <!-- Nút quay lại -->
         <ImageButton
+            android:id="@+id/back_btn"
             android:layout_width="32dp"
             android:layout_height="32dp"
             android:src="@drawable/icon_back"
             android:background="?attr/selectableItemBackgroundBorderless"
             app:tint="@color/white"
-            android:layout_centerVertical="true"
-            android:id="@+id/back_btn"/>
+            android:layout_centerVertical="true" />
 
+        <!-- Avatar -->
+        <include
+            android:id="@+id/profile_pic_layout"
+            layout="@layout/profile_pic_view"
+            android:layout_width="48dp"
+            android:layout_height="48dp"
+            android:layout_marginStart="10dp"
+            android:layout_toRightOf="@id/back_btn" />
+
+        <!-- Tên + Trạng thái -->
+        <LinearLayout
+            android:id="@+id/user_info_layout"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:orientation="vertical"
+            android:layout_toRightOf="@id/profile_pic_layout"
+            android:layout_centerVertical="true"
+            android:layout_marginStart="10dp">
+
+            <TextView
+                android:id="@+id/other_username"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="Username"
+                android:textSize="20sp"
+                android:textStyle="bold"
+                android:textColor="@color/white" />
+
+            <TextView
+                android:id="@+id/online_status"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="Online"
+                android:textSize="13sp"
+                android:textColor="@color/light_green"
+                android:drawableStart="@drawable/icon_dot_green"
+                android:drawablePadding="4dp"
+                android:visibility="gone"/>
+        </LinearLayout>
     </RelativeLayout>
 
+    <!-- Danh sách tin nhắn -->
     <androidx.recyclerview.widget.RecyclerView
+        android:id="@+id/chat_recycler_view"
         android:layout_width="match_parent"
         android:layout_height="match_parent"
         android:layout_below="@id/toolbar"
-        android:layout_above="@id/bottom_layout"
-        android:id="@+id/chat_recycler_view"/>
+        android:layout_above="@id/bottom_layout" />
 
+    <!-- Thanh nhập tin nhắn -->
     <RelativeLayout
+        android:id="@+id/bottom_layout"
         android:layout_width="match_parent"
         android:layout_height="80dp"
         android:layout_alignParentBottom="true"
-        android:padding="8dp"
-        android:id="@+id/bottom_layout">
+        android:padding="8dp">
 
+        <!-- Ô nhập -->
         <EditText
+            android:id="@+id/chat_message_input"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:layout_centerInParent="true"
@@ -71,23 +95,20 @@
             android:background="@drawable/edit_text_rounded_corner"
             android:elevation="4dp"
             android:hint="Write message here"
-            android:padding="10dp"
-            android:id="@+id/chat_message_input"/>
+            android:padding="10dp" />
 
+        <!-- Nút gửi -->
         <ImageButton
+            android:id="@+id/message_send_btn"
             android:layout_width="48dp"
             android:layout_height="48dp"
-            android:src="@drawable/icon_send"
             android:layout_alignParentEnd="true"
             android:layout_centerInParent="true"
+            android:src="@drawable/icon_send"
             android:background="?attr/selectableItemBackgroundBorderless"
             app:tint="@color/my_primary"
-            android:id="@+id/message_send_btn"
             android:padding="8dp"
-            android:layout_marginStart="10dp"
-            />
-
+            android:layout_marginStart="10dp"/>
     </RelativeLayout>
-
 
 </RelativeLayout>

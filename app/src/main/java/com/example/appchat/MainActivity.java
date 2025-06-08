@@ -53,6 +53,19 @@ public class MainActivity extends AppCompatActivity {
         getFCMToken();
 
     }
+    @Override
+    protected void onResume() {
+        super.onResume();
+        FirebaseUtil.currentUserDetails().update("online", true);
+    }
+
+    @Override
+    protected void onPause() {
+        super.onPause();
+        FirebaseUtil.currentUserDetails().update("online", false,
+                "lastSeen", com.google.firebase.Timestamp.now());
+    }
+
 
     void getFCMToken(){
         FirebaseMessaging.getInstance().getToken().addOnCompleteListener(task -> {

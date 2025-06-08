@@ -12,5 +12,8 @@
 
     <color name="chat_color_sender">#1E88E5</color>
     <color name="chat_color_receiver">#7CB342</color>
+    <color name="light_green">#4CAF50</color> <!-- xanh lá nhẹ -->
+    <color name="gray">#888888</color>         <!-- xám nhạt -->
+
 
 </resources>
