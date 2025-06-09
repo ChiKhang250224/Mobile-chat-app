@@ -1,23 +1,26 @@
 <resources>
-    <!-- Màu chủ đạo (primary) - dùng cho toolbar, button -->
-    <color name="my_primary">#1976D2</color> <!-- Xanh dương vừa (Blue 700) -->
+    <!-- Màu chủ đạo (primary) -->
+    <color name="my_primary">#1565C0</color> <!-- Blue 800 -->
 
-    <!-- Màu phụ (secondary) - dùng để tạo điểm nhấn -->
-    <color name="my_secondary">#64B5F6</color> <!-- Blue 300 -->
+    <!-- Màu phụ (accent) -->
+    <color name="my_secondary">#90CAF9</color> <!-- Blue 200 -->
 
-    <!-- Màu nền -->
+    <!-- Nền -->
     <color name="white">#FFFFFF</color>
-    <color name="off_white">#F5F5F5</color> <!-- xám rất nhạt -->
+    <color name="off_white">#FAFAFA</color> <!-- xám rất nhạt, sáng hơn -->
 
     <!-- Text -->
     <color name="black">#212121</color>
-    <color name="gray">#757575</color> <!-- xám trung bình -->
-    <color name="light_gray">#BDBDBD</color> <!-- xám nhạt -->
+    <color name="gray">#616161</color>
+    <color name="light_gray">#BDBDBD</color>
 
     <!-- Màu bong bóng chat -->
-    <color name="chat_color_sender">#E3F2FD</color> <!-- xanh nhạt (user gửi) -->
-    <color name="chat_color_receiver">#DCF8C6</color> <!-- xanh lá nhạt (người nhận), như WhatsApp -->
+    <color name="chat_color_sender">#E1F5FE</color> <!-- xanh nhạt hơn -->
+    <color name="chat_color_receiver">#E8F5E9</color> <!-- xanh lá nhạt nhẹ -->
+
+    <!-- Tin hệ thống / thông báo -->
+    <color name="chat_system_message">#F1F8E9</color> <!-- màu vàng-xanh nhạt -->
 
     <!-- Trạng thái online -->
-    <color name="light_green">#4CAF50</color> <!-- xanh lá nhẹ, giữ nguyên -->
+    <color name="light_green">#4CAF50</color>
 </resources>
