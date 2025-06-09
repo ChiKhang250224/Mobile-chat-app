@@ -2,13 +2,25 @@ package com.example.appchat;
 
 // Nhập các thư viện cần thiết cho Activity, RecyclerView, Firebase, và thông báo
 
+import androidx.activity.result.ActivityResultLauncher;
+import androidx.activity.result.contract.ActivityResultContracts;
 import androidx.annotation.NonNull;
+import androidx.annotation.Nullable;
 import androidx.appcompat.app.AppCompatActivity;
+import androidx.core.app.ActivityCompat;
+import androidx.core.content.ContextCompat;
 import androidx.recyclerview.widget.LinearLayoutManager;
 import androidx.recyclerview.widget.RecyclerView;
 
+import android.Manifest;
+import android.app.Activity;
+import android.content.Intent;
+import android.content.pm.PackageManager;
 import android.net.Uri;
+import android.os.Build;
 import android.os.Bundle;
+import android.provider.MediaStore;
+import android.util.Base64;
 import android.util.Log;
 import android.view.View;
 import android.widget.EditText;
@@ -16,6 +28,19 @@ import android.widget.ImageButton;
 import android.widget.ImageView;
 import android.widget.TextView;
 import android.widget.Toast;
+
+import java.io.InputStream;
+
+import java.io.IOException;
+import okhttp3.FormBody;
+import okhttp3.OkHttpClient;
+import okhttp3.Request;
+import okhttp3.RequestBody;
+import okhttp3.Callback;
+import okhttp3.Call;
+
+
+
 
 import com.example.appchat.adapter.ChatRecyclerAdapter;
 import com.example.appchat.adapter.SearchUserRecyclerAdapter;
@@ -32,19 +57,13 @@ import com.google.firebase.Timestamp;
 import com.google.firebase.firestore.DocumentReference;
 import com.google.firebase.firestore.DocumentSnapshot;
 import com.google.firebase.firestore.Query;
+import com.google.firebase.storage.FirebaseStorage;
+import com.google.firebase.storage.StorageReference;
 
 import org.json.JSONObject;
-
-import java.io.IOException;
 import java.util.Arrays;
-
-
-import okhttp3.Call;
 import okhttp3.MediaType;
-import okhttp3.OkHttpClient;
-import okhttp3.RequestBody;
-import okhttp3.Request;
-import okhttp3.Callback;
+
 
 public class ChatActivity extends AppCompatActivity {
 
@@ -64,6 +83,15 @@ public class ChatActivity extends AppCompatActivity {
     TextView otherUsername; // TextView hiển thị tên người dùng khác
     RecyclerView recyclerView; // RecyclerView hiển thị danh sách tin nhắn
     ImageView imageView; // ImageView hiển thị ảnh đại diện
+    private ActivityResultLauncher<Intent> imagePickerLauncher;
+    private Uri selectedImageUri;
+    private static final int REQUEST_IMAGE_PICK = 101;
+    private static final int REQUEST_PERMISSION = 102;
+
+
+
+
+
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -79,6 +107,27 @@ public class ChatActivity extends AppCompatActivity {
         recyclerView = findViewById(R.id.chat_recycler_view);
         imageView = findViewById(R.id.profile_pic_image_view);
         TextView onlineStatus = findViewById(R.id.online_status);
+        ImageButton sendImageBtn = findViewById(R.id.send_image_btn); // gán view
+        imagePickerLauncher = registerForActivityResult(
+                new ActivityResultContracts.StartActivityForResult(),
+                result -> {
+                    if (result.getResultCode() == Activity.RESULT_OK && result.getData() != null) {
+                        selectedImageUri = result.getData().getData();
+                        // Gọi hàm upload ảnh
+                        uploadImageToImgBB(selectedImageUri);
+
+                        // TODO: xử lý ảnh khác nếu cần
+                    }
+                }
+        );
+
+
+
+        sendImageBtn.setOnClickListener(v -> {
+            Intent intent = new Intent(Intent.ACTION_PICK);
+            intent.setType("image/*");
+            imagePickerLauncher.launch(intent);
+        });
 
         // Lấy thông tin người dùng khác từ Intent
         otherUser = AndroidUtils.getUserModelFromIntent(getIntent());
@@ -105,8 +154,9 @@ public class ChatActivity extends AppCompatActivity {
 
         // Xử lý sự kiện nhấn nút quay lại
         backBtn.setOnClickListener((v) -> {
-            onBackPressed();
+            getOnBackPressedDispatcher().onBackPressed();
         });
+
 
         // Hiển thị trạng thái online hoặc last seen
         FirebaseUtil.allUserCollectionReference()
@@ -184,6 +234,70 @@ public class ChatActivity extends AppCompatActivity {
             }
         });
     }
+    private void uploadImageToImgBB(Uri imageUri) {
+        try {
+            InputStream inputStream = getContentResolver().openInputStream(imageUri);
+            byte[] imageBytes = new byte[inputStream.available()];
+            inputStream.read(imageBytes);
+            String encodedImage = Base64.encodeToString(imageBytes, Base64.DEFAULT);
+
+            OkHttpClient client = new OkHttpClient();
+            RequestBody requestBody = new FormBody.Builder()
+                    .add("key", "f8c48e870cff1f6cb6c43a1b9633ac9a") // 👉 thay bằng API Key của bạn
+                    .add("image", encodedImage)
+                    .build();
+
+            Request request = new Request.Builder()
+                    .url("https://api.imgbb.com/1/upload")
+                    .post(requestBody)
+                    .build();
+
+            client.newCall(request).enqueue(new Callback() {
+                @Override
+                public void onFailure(@NonNull Call call, @NonNull IOException e) {
+                    runOnUiThread(() -> Toast.makeText(ChatActivity.this, "Lỗi upload ảnh", Toast.LENGTH_SHORT).show());
+                }
+
+                @Override
+                public void onResponse(@NonNull Call call, @NonNull okhttp3.Response response) throws IOException {
+                    try {
+                        String responseBody = response.body().string();
+                        JSONObject jsonObject = new JSONObject(responseBody);
+                        String imageUrl = jsonObject.getJSONObject("data").getString("url");
+                        runOnUiThread(() -> sendImageMessage(imageUrl));
+                    } catch (Exception e) {
+                        runOnUiThread(() -> Toast.makeText(ChatActivity.this, "Lỗi phản hồi ImgBB", Toast.LENGTH_SHORT).show());
+                    }
+                }
+            });
+
+        } catch (IOException e) {
+            Toast.makeText(this, "Không đọc được ảnh", Toast.LENGTH_SHORT).show();
+        }
+    }
+
+
+    private void sendImageMessage(String imageUrl) {
+        // ✅ Cập nhật thông tin chatroom trước khi gửi ảnh
+        chatroomModel.setLastMessageTimestamp(Timestamp.now());
+        chatroomModel.setLastMessageSenderId(FirebaseUtil.currentUserId());
+        chatroomModel.setLastMessage("📷 Sent a photo");
+
+        // ✅ Gửi ảnh như cũ
+        ChatMessageModel chatMessage = new ChatMessageModel("photo", FirebaseUtil.currentUserId(), Timestamp.now());
+        chatMessage.setImageUrl(imageUrl);
+        FirebaseUtil.getChatroomMessageReference(chatroomId)
+                .add(chatMessage)
+                .addOnSuccessListener(docRef -> {
+                    sendNotification("📷 Sent a photo");
+                })
+                .addOnFailureListener(e -> {
+                    Log.e("SEND_IMG", "Lỗi khi gửi ảnh", e);
+                    Toast.makeText(this, "Không gửi được ảnh", Toast.LENGTH_SHORT).show();
+                });
+    }
+
+
 
     void sendMessageToUser(String message) {
         // Cập nhật thông tin phòng chat
@@ -262,6 +376,56 @@ public class ChatActivity extends AppCompatActivity {
         });
 
     }
+    // chọn ảnh từ thu viện
+    private void openImagePicker() {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+            if (ContextCompat.checkSelfPermission(this, Manifest.permission.READ_MEDIA_IMAGES)
+                    != PackageManager.PERMISSION_GRANTED) {
+                ActivityCompat.requestPermissions(this,
+                        new String[]{Manifest.permission.READ_MEDIA_IMAGES}, REQUEST_PERMISSION);
+                return;
+            }
+        } else {
+            if (ContextCompat.checkSelfPermission(this, Manifest.permission.READ_EXTERNAL_STORAGE)
+                    != PackageManager.PERMISSION_GRANTED) {
+                ActivityCompat.requestPermissions(this,
+                        new String[]{Manifest.permission.READ_EXTERNAL_STORAGE}, REQUEST_PERMISSION);
+                return;
+            }
+        }
+
+        Intent intent = new Intent(Intent.ACTION_PICK, MediaStore.Images.Media.EXTERNAL_CONTENT_URI);
+        intent.setType("image/*");
+        imagePickerLauncher.launch(intent);  // ✅ dùng launcher thay vì startActivityForResult
+    }
+
+    @Override
+    protected void onActivityResult(int requestCode, int resultCode, @Nullable Intent data) {
+        super.onActivityResult(requestCode, resultCode, data);
+
+        if (requestCode == REQUEST_IMAGE_PICK && resultCode == RESULT_OK && data != null) {
+            selectedImageUri = data.getData();
+            if (selectedImageUri != null) {
+                uploadImageToImgBB(selectedImageUri);
+
+            }
+        }
+    }
+
+    @Override
+    public void onRequestPermissionsResult(int requestCode, @NonNull String[] permissions, @NonNull int[] grantResults) {
+        super.onRequestPermissionsResult(requestCode, permissions, grantResults);
+        if (requestCode == REQUEST_PERMISSION) {
+            if (grantResults.length > 0 && grantResults[0] == PackageManager.PERMISSION_GRANTED) {
+                openImagePicker();
+            } else {
+                Toast.makeText(this, "Bạn cần cấp quyền để chọn ảnh", Toast.LENGTH_SHORT).show();
+            }
+        }
+    }
+
+
+
 
     void callApi(JSONObject jsonObject){
         MediaType JSON = MediaType.get("application/json; charset=utf-8");

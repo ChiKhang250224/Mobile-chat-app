@@ -1,9 +1,6 @@
 package com.example.appchat.adapter;
 
-// Nhập các thư viện cần thiết cho RecyclerView và Firebase
-
 import android.content.Context;
-import android.content.Intent;
 import android.util.Log;
 import android.view.LayoutInflater;
 import android.view.View;
@@ -15,73 +12,76 @@ import android.widget.TextView;
 import androidx.annotation.NonNull;
 import androidx.recyclerview.widget.RecyclerView;
 
-import com.example.appchat.ChatActivity;
+import com.bumptech.glide.Glide;
 import com.example.appchat.R;
 import com.example.appchat.model.ChatMessageModel;
-import com.example.appchat.utils.AndroidUtils;
 import com.example.appchat.utils.FirebaseUtil;
 import com.firebase.ui.firestore.FirestoreRecyclerAdapter;
 import com.firebase.ui.firestore.FirestoreRecyclerOptions;
 
-// Lớp adapter để hiển thị danh sách tin nhắn trong RecyclerView
 public class ChatRecyclerAdapter extends FirestoreRecyclerAdapter<ChatMessageModel, ChatRecyclerAdapter.ChatModelViewHolder> {
 
-    // Biến lưu trữ Context của ứng dụng
     Context context;
 
-    // Constructor nhận FirestoreRecyclerOptions và Context
     public ChatRecyclerAdapter(@NonNull FirestoreRecyclerOptions<ChatMessageModel> options, Context context) {
-        super(options); // Gọi constructor của lớp cha
-        this.context = context; // Lưu Context để sử dụng
+        super(options);
+        this.context = context;
     }
 
-    // Gắn dữ liệu của ChatMessageModel vào ViewHolder
     @Override
     protected void onBindViewHolder(@NonNull ChatModelViewHolder holder, int position, @NonNull ChatMessageModel model) {
-        // Ghi log để debug (có thể xóa khi không cần)
-        Log.i("haushd", "asjd");
-        // Kiểm tra xem tin nhắn có phải của người dùng hiện tại hay không
         if (model.getSenderId().equals(FirebaseUtil.currentUserId())) {
-            // Nếu là tin nhắn của người dùng hiện tại
-            holder.leftChatLayout.setVisibility(View.GONE); // Ẩn layout tin nhắn bên trái
-            holder.rightChatLayout.setVisibility(View.VISIBLE); // Hiển thị layout tin nhắn bên phải
-            holder.rightChatTextview.setText(model.getMessage()); // Đặt nội dung tin nhắn vào TextView bên phải
+            // Tin nhắn của người dùng hiện tại (bên phải)
+            holder.leftChatLayout.setVisibility(View.GONE);
+            holder.rightChatLayout.setVisibility(View.VISIBLE);
+
+            if (model.getImageUrl() != null && !model.getImageUrl().isEmpty()) {
+                holder.rightChatTextview.setVisibility(View.GONE);
+                holder.rightImageView.setVisibility(View.VISIBLE);
+                Glide.with(context).load(model.getImageUrl()).into(holder.rightImageView);
+            } else {
+                holder.rightImageView.setVisibility(View.GONE);
+                holder.rightChatTextview.setVisibility(View.VISIBLE);
+                holder.rightChatTextview.setText(model.getMessage());
+            }
+
         } else {
-            // Nếu là tin nhắn của người khác
-            holder.rightChatLayout.setVisibility(View.GONE); // Ẩn layout tin nhắn bên phải
-            holder.leftChatLayout.setVisibility(View.VISIBLE); // Hiển thị layout tin nhắn bên trái
-            holder.leftChatTextview.setText(model.getMessage()); // Đặt nội dung tin nhắn vào TextView bên trái
+            // Tin nhắn từ người khác (bên trái)
+            holder.rightChatLayout.setVisibility(View.GONE);
+            holder.leftChatLayout.setVisibility(View.VISIBLE);
+
+            if (model.getImageUrl() != null && !model.getImageUrl().isEmpty()) {
+                holder.leftChatTextview.setVisibility(View.GONE);
+                holder.leftImageView.setVisibility(View.VISIBLE);
+                Glide.with(context).load(model.getImageUrl()).into(holder.leftImageView);
+            } else {
+                holder.leftImageView.setVisibility(View.GONE);
+                holder.leftChatTextview.setVisibility(View.VISIBLE);
+                holder.leftChatTextview.setText(model.getMessage());
+            }
         }
     }
 
-    // Tạo ViewHolder mới cho mỗi mục trong RecyclerView
     @NonNull
     @Override
     public ChatModelViewHolder onCreateViewHolder(@NonNull ViewGroup parent, int viewType) {
-        // Inflate layout cho mỗi hàng trong RecyclerView từ file chat_message_recycler_row.xml
         View view = LayoutInflater.from(context).inflate(R.layout.chat_message_recycler_row, parent, false);
         return new ChatModelViewHolder(view);
     }
 
-    // Lớp ViewHolder để lưu trữ các thành phần giao diện của mỗi hàng tin nhắn
     class ChatModelViewHolder extends RecyclerView.ViewHolder {
-        // Layout cho tin nhắn bên trái (người khác gửi)
-        LinearLayout leftChatLayout;
-        // Layout cho tin nhắn bên phải (người dùng hiện tại gửi)
-        LinearLayout rightChatLayout;
-        // TextView hiển thị nội dung tin nhắn bên trái
-        TextView leftChatTextview;
-        // TextView hiển thị nội dung tin nhắn bên phải
-        TextView rightChatTextview;
+        LinearLayout leftChatLayout, rightChatLayout;
+        TextView leftChatTextview, rightChatTextview;
+        ImageView leftImageView, rightImageView;
 
-        // Constructor của ViewHolder
         public ChatModelViewHolder(@NonNull View itemView) {
             super(itemView);
-            // Gán các thành phần giao diện từ layout
             leftChatLayout = itemView.findViewById(R.id.left_chat_layout);
             rightChatLayout = itemView.findViewById(R.id.right_chat_layout);
             leftChatTextview = itemView.findViewById(R.id.left_chat_textview);
             rightChatTextview = itemView.findViewById(R.id.right_chat_textview);
+            leftImageView = itemView.findViewById(R.id.left_chat_image_view);
+            rightImageView = itemView.findViewById(R.id.right_chat_image_view);
         }
     }
 }

@@ -26,36 +26,52 @@ android {
             )
         }
     }
+
     compileOptions {
         sourceCompatibility = JavaVersion.VERSION_11
         targetCompatibility = JavaVersion.VERSION_11
     }
+
+    // 👉 Thêm để hiển thị cảnh báo deprecated rõ ràng
+    tasks.withType<JavaCompile>().configureEach {
+        options.compilerArgs.add("-Xlint:deprecation")
+    }
 }
 
 dependencies {
-
     implementation(libs.appcompat)
     implementation(libs.material)
     implementation(libs.activity)
     implementation(libs.constraintlayout)
-    implementation(libs.firebase.firestore)
-    implementation(libs.firebase.storage)
-    implementation(libs.firebase.messaging)
+
+    // Firebase
+    implementation(platform("com.google.firebase:firebase-bom:33.14.0"))
+    implementation("com.google.firebase:firebase-auth")
+    implementation("com.google.firebase:firebase-firestore:24.9.1")
+    implementation("com.google.firebase:firebase-storage")
+    implementation("com.google.firebase:firebase-messaging-ktx:23.1.2")
+
+    // Firebase UI
+    implementation("com.firebaseui:firebase-ui-firestore:8.0.2")
+
+    // Country Code Picker
+    implementation("com.hbb20:ccp:2.5.0")
+
+    // Glide
+    implementation("com.github.bumptech.glide:glide:4.15.1")
+    annotationProcessor("com.github.bumptech.glide:compiler:4.15.1")
+
+    // Image Picker
+    implementation("com.github.dhaval2404:imagepicker:2.1")
+
+    // OkHttp (REST API)
+    implementation("com.squareup.okhttp3:okhttp:4.12.0")
+
+    // org.json
+    implementation("org.json:json:20231013")
+
+    // Testing
     testImplementation(libs.junit)
     androidTestImplementation(libs.ext.junit)
     androidTestImplementation(libs.espresso.core)
-    implementation(platform("com.google.firebase:firebase-bom:33.14.0"))
-    implementation("com.google.firebase:firebase-auth")
-    implementation ("com.google.firebase:firebase-firestore:24.9.1")
-    implementation("com.hbb20:ccp:2.5.0")
-    implementation ("com.firebaseui:firebase-ui-firestore:8.0.2")
-    implementation ("com.google.firebase:firebase-firestore")
-    implementation ("com.github.bumptech.glide:glide:4.15.1")
-    annotationProcessor ("com.github.bumptech.glide:compiler:4.15.1")
-    implementation ("com.google.firebase:firebase-messaging-ktx:23.1.2")
-    implementation ("com.github.dhaval2404:imagepicker:2.1")
-    implementation ("com.squareup.okhttp3:okhttp:4.12.0")
-
-
-
 }
