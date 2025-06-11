@@ -38,7 +38,7 @@
     <TextView
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:text="Developed by easy tuto"
+        android:text="Developed by Nhom 8 Mobile App"
         android:layout_alignParentBottom="true"
         android:gravity="center"
         android:layout_marginBottom="20dp"

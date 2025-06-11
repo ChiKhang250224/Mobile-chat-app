@@ -1,26 +1,30 @@
 <resources>
-    <!-- Màu chủ đạo (primary) -->
-    <color name="my_primary">#1565C0</color> <!-- Blue 800 -->
+    <!-- Màu chủ đạo (primary): xanh navy đậm giống nền -->
+    <color name="my_primary">#1A2B49</color> <!-- Deep Navy Blue -->
 
-    <!-- Màu phụ (accent) -->
-    <color name="my_secondary">#90CAF9</color> <!-- Blue 200 -->
+    <!-- Màu phụ (accent): vàng sáng của vương miện -->
+    <color name="my_secondary">#FFD54F</color> <!-- Amber 300 / Gold-ish -->
 
-    <!-- Nền -->
+    <!-- Nền chung -->
     <color name="white">#FFFFFF</color>
-    <color name="off_white">#FAFAFA</color> <!-- xám rất nhạt, sáng hơn -->
+    <color name="off_white">#F5F5F5</color> <!-- Sáng vừa đủ để tách biệt -->
 
     <!-- Text -->
     <color name="black">#212121</color>
-    <color name="gray">#616161</color>
+    <color name="gray">#757575</color>
     <color name="light_gray">#BDBDBD</color>
 
     <!-- Màu bong bóng chat -->
-    <color name="chat_color_sender">#E1F5FE</color> <!-- xanh nhạt hơn -->
-    <color name="chat_color_receiver">#E8F5E9</color> <!-- xanh lá nhạt nhẹ -->
+    <color name="chat_color_sender">#FFF8E1</color> <!-- vàng nhạt -->
+    <color name="chat_color_receiver">#E3F2FD</color> <!-- xanh nhạt dịu -->
 
     <!-- Tin hệ thống / thông báo -->
-    <color name="chat_system_message">#F1F8E9</color> <!-- màu vàng-xanh nhạt -->
+    <color name="chat_system_message">#FFFDE7</color> <!-- vàng nhạt nhẹ -->
 
     <!-- Trạng thái online -->
-    <color name="light_green">#4CAF50</color>
+    <color name="light_green">#66BB6A</color> <!-- xanh lá nhạt hơn -->
+
+    <!-- Màu nền biểu tượng -->
+    <color name="crown_background">#1A2B49</color> <!-- phù hợp icon -->
+    <color name="crown_gold">#FFD54F</color> <!-- màu vương miện -->
 </resources>

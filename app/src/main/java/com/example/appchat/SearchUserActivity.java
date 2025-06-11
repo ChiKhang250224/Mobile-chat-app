@@ -44,8 +44,8 @@ public class SearchUserActivity extends AppCompatActivity {
 
         // Xử lý sự kiện khi nhấn nút quay lại
         backButton.setOnClickListener(v -> {
-            // Gọi phương thức quay lại Activity trước đó
-            onBackPressed();
+            // Gọi phương thức quay lại Activity trước đó (cách mới)
+            getOnBackPressedDispatcher().onBackPressed();
         });
 
         // Xử lý sự kiện khi nhấn nút tìm kiếm
