@@ -1,26 +1,14 @@
 package com.example.appchat;
 
-// Nhập các thư viện cần thiết cho Activity, RecyclerView, Firebase, và thông báo
-
-import androidx.activity.result.ActivityResultLauncher;
-import androidx.activity.result.contract.ActivityResultContracts;
 import androidx.annotation.NonNull;
-import androidx.annotation.Nullable;
+import androidx.appcompat.app.AlertDialog;
 import androidx.appcompat.app.AppCompatActivity;
-import androidx.core.app.ActivityCompat;
-import androidx.core.content.ContextCompat;
 import androidx.recyclerview.widget.LinearLayoutManager;
 import androidx.recyclerview.widget.RecyclerView;
 
-import android.Manifest;
-import android.app.Activity;
 import android.content.Intent;
-import android.content.pm.PackageManager;
 import android.net.Uri;
-import android.os.Build;
 import android.os.Bundle;
-import android.provider.MediaStore;
-import android.util.Base64;
 import android.util.Log;
 import android.view.View;
 import android.widget.EditText;
@@ -29,141 +17,176 @@ import android.widget.ImageView;
 import android.widget.TextView;
 import android.widget.Toast;
 
-import java.io.InputStream;
-
-import java.io.IOException;
-import okhttp3.FormBody;
-import okhttp3.OkHttpClient;
-import okhttp3.Request;
-import okhttp3.RequestBody;
-import okhttp3.Callback;
-import okhttp3.Call;
-
-
-
-
 import com.example.appchat.adapter.ChatRecyclerAdapter;
-import com.example.appchat.adapter.SearchUserRecyclerAdapter;
 import com.example.appchat.model.ChatMessageModel;
 import com.example.appchat.model.ChatroomModel;
 import com.example.appchat.model.UserModel;
 import com.example.appchat.utils.AndroidUtils;
 import com.example.appchat.utils.FirebaseUtil;
 import com.firebase.ui.firestore.FirestoreRecyclerOptions;
-import com.google.android.gms.common.api.Response;
-import com.google.android.gms.tasks.OnCompleteListener;
-import com.google.android.gms.tasks.Task;
 import com.google.firebase.Timestamp;
+import com.google.firebase.firestore.CollectionReference;
 import com.google.firebase.firestore.DocumentReference;
-import com.google.firebase.firestore.DocumentSnapshot;
+import com.google.firebase.firestore.FieldValue;
 import com.google.firebase.firestore.Query;
 import com.google.firebase.storage.FirebaseStorage;
 import com.google.firebase.storage.StorageReference;
 
-import org.json.JSONObject;
-import java.util.Arrays;
-import okhttp3.MediaType;
 
+import org.json.JSONObject;
+
+import java.io.IOException;
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.UUID;
+
+import okhttp3.Call;
+import okhttp3.Callback;
+import okhttp3.MediaType;
+import okhttp3.OkHttpClient;
+import okhttp3.RequestBody;
+import okhttp3.Request;
+import okhttp3.Response;
 
 public class ChatActivity extends AppCompatActivity {
 
-    // Khai báo biến để lưu thông tin người dùng khác
     UserModel otherUser;
-    // ID của phòng chat
-    String chatroomId;
-    // Model cho phòng chat
-    ChatroomModel chatroomModel;
-    // Adapter để hiển thị danh sách tin nhắn trong RecyclerView
+    String currentChatroomId;
+    ChatroomModel currentChatroomModel;
     ChatRecyclerAdapter adapter;
 
-    // Các thành phần giao diện
-    EditText messageInput; // Ô nhập tin nhắn
-    ImageButton sendMessageBtn; // Nút gửi tin nhắn
-    ImageButton backBtn; // Nút quay lại
-    TextView otherUsername; // TextView hiển thị tên người dùng khác
-    RecyclerView recyclerView; // RecyclerView hiển thị danh sách tin nhắn
-    ImageView imageView; // ImageView hiển thị ảnh đại diện
-    private ActivityResultLauncher<Intent> imagePickerLauncher;
-    private Uri selectedImageUri;
-    private static final int REQUEST_IMAGE_PICK = 101;
-    private static final int REQUEST_PERMISSION = 102;
+    boolean isGroupChat;
 
-
-
-
-
+    EditText messageInput;
+    ImageButton sendMessageBtn, backBtn, sendImageBtn, addMemberBtn;
+    TextView otherUsername, onlineStatus;
+    ImageView profilePicImageView;
+    RecyclerView recyclerView;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
-        // Liên kết Activity với file layout activity_chat.xml
         setContentView(R.layout.activity_chat);
 
-        // Gán các thành phần giao diện từ layout
         messageInput = findViewById(R.id.chat_message_input);
         sendMessageBtn = findViewById(R.id.message_send_btn);
         backBtn = findViewById(R.id.back_btn);
-        otherUsername = findViewById(R.id.other_username); // 👈 Cần gọi findViewById trước khi setText
+        otherUsername = findViewById(R.id.other_username);
         recyclerView = findViewById(R.id.chat_recycler_view);
-        imageView = findViewById(R.id.profile_pic_image_view);
-        TextView onlineStatus = findViewById(R.id.online_status);
-        ImageButton sendImageBtn = findViewById(R.id.send_image_btn); // gán view
-        imagePickerLauncher = registerForActivityResult(
-                new ActivityResultContracts.StartActivityForResult(),
-                result -> {
-                    if (result.getResultCode() == Activity.RESULT_OK && result.getData() != null) {
-                        selectedImageUri = result.getData().getData();
-                        // Gọi hàm upload ảnh
-                        uploadImageToImgBB(selectedImageUri);
-
-                        // TODO: xử lý ảnh khác nếu cần
-                    }
-                }
-        );
+        profilePicImageView = findViewById(R.id.profile_pic_image_view);
+        onlineStatus = findViewById(R.id.online_status);
+        addMemberBtn = findViewById(R.id.add_group_btn);
 
 
+        isGroupChat = getIntent().getBooleanExtra("IS_GROUP_CHAT", false);
 
-        sendImageBtn.setOnClickListener(v -> {
-            Intent intent = new Intent(Intent.ACTION_PICK);
-            intent.setType("image/*");
-            imagePickerLauncher.launch(intent);
+        if (isGroupChat) {
+            currentChatroomId = getIntent().getStringExtra("GROUP_ID");
+            if (currentChatroomId == null || currentChatroomId.isEmpty()) {
+                Toast.makeText(this, "Lỗi: Không tìm thấy ID nhóm.", Toast.LENGTH_LONG).show();
+                Log.e("ChatActivity", "Group ID was null or empty for group chat.");
+                finish();
+                return;
+            }
+            Log.d("ChatActivity", "Opening Group Chat with ID: " + currentChatroomId);
+            loadGroupInfoAndSetupUI(currentChatroomId);
+            addMemberBtn.setVisibility(View.VISIBLE);
+            addMemberBtn.setImageResource(R.drawable.ic_add_member);
+        } else {
+            otherUser = AndroidUtils.getUserModelFromIntent(getIntent());
+            if (otherUser == null) {
+                Toast.makeText(this, "Lỗi: Không tìm thấy thông tin người dùng.", Toast.LENGTH_LONG).show();
+                Log.e("ChatActivity", "Other user was null for 1-1 chat.");
+                finish();
+                return;
+            }
+            currentChatroomId = FirebaseUtil.getChatroomId(FirebaseUtil.currentUserId(), otherUser.getUserId());
+            Log.d("ChatActivity", "Opening 1-1 Chat with ID: " + currentChatroomId + " and user: " + otherUser.getUsername());
+            setupOneToOneUI(otherUser);
+            addMemberBtn.setVisibility(View.VISIBLE);
+            addMemberBtn.setImageResource(R.drawable.ic_add_member);
+        }
+
+        backBtn.setOnClickListener(v -> onBackPressed());
+
+        if (!isGroupChat && otherUser != null) {
+            listenForOnlineStatus();
+        } else {
+            onlineStatus.setVisibility(View.GONE);
+        }
+
+        sendMessageBtn.setOnClickListener(v -> {
+            String message = messageInput.getText().toString().trim();
+            if (!message.isEmpty()) {
+                sendMessage(message, null);
+            }
         });
 
-        // Lấy thông tin người dùng khác từ Intent
-        otherUser = AndroidUtils.getUserModelFromIntent(getIntent());
+        sendImageBtn = findViewById(R.id.send_image_btn);
+        sendImageBtn.setOnClickListener(v -> selectImage());
 
-        //
-        if (otherUser != null && otherUser.getUsername() != null) {
-            otherUsername.setText(otherUser.getUsername());
-        } else {
-            otherUsername.setText("Unknown");
-        }
-        //
+        addMemberBtn.setOnClickListener(v -> {
+            if (isGroupChat) {
+                Intent intent = new Intent(ChatActivity.this, AddMemberActivity.class);
+                intent.putExtra("chatroomId", currentChatroomId);
+                startActivity(intent);
+            } else {
+                showCreateGroupDialog();
+            }
+        });
+        getOrCreateChatroomModel();
+        setupChatRecyclerView();
+    }
+    private void loadGroupInfoAndSetupUI(String groupId) {
+        FirebaseUtil.getGroupChatroomReference(groupId).addSnapshotListener((documentSnapshot, e) -> {
+            if (e != null) {
+                Log.e("ChatActivity", "Error listening for group info: " + e.getMessage());
+                return;
+            }
+            if (documentSnapshot != null && documentSnapshot.exists()) {
+                currentChatroomModel = documentSnapshot.toObject(ChatroomModel.class);
+                if (currentChatroomModel != null) {
+                    String groupName = currentChatroomModel.getGroupName();
+                    if (groupName != null && !groupName.isEmpty()) {
+                        otherUsername.setText(groupName);
+                    } else {
+                        otherUsername.setText("Group Chat");
+                    }
+                    // TODO: Load group image if available and display it on profilePicImageView
+                    profilePicImageView.setImageResource(R.drawable.chat_icon); // Default icon for group
+                    onlineStatus.setVisibility(View.GONE); // Hide online status for groups
+                }
+            } else {
+                Log.d("ChatActivity", "Group document not found for ID: " + groupId);
+                otherUsername.setText("Nhóm không tồn tại"); // Group does not exist
+                profilePicImageView.setImageResource(R.drawable.ic_avatar_placeholder);
+            }
+        });
+    }
 
-        // Tạo ID phòng chat dựa trên ID của người dùng hiện tại và người dùng khác
-        chatroomId = FirebaseUtil.getChatroomId(FirebaseUtil.currentUserId(), otherUser.getUserId());
-
-        // Tải ảnh đại diện của người kia
-        FirebaseUtil.getOtherProfilePicStorageRef(otherUser.getUserId()).getDownloadUrl()
+    private void setupOneToOneUI(UserModel user) {
+        otherUsername.setText(user.getUsername());
+        // Load the other user's profile picture
+        FirebaseUtil.getOtherProfilePicStorageRef(user.getUserId()).getDownloadUrl()
                 .addOnCompleteListener(t -> {
                     if (t.isSuccessful()) {
                         Uri uri = t.getResult();
-                        AndroidUtils.setProfilePic(this, uri, imageView);
+                        AndroidUtils.setProfilePic(this, uri, profilePicImageView);
+                    } else {
+                        profilePicImageView.setImageResource(R.drawable.ic_avatar_placeholder);
                     }
                 });
+    }
 
-        // Xử lý sự kiện nhấn nút quay lại
-        backBtn.setOnClickListener((v) -> {
-            getOnBackPressedDispatcher().onBackPressed();
-        });
-
-
-        // Hiển thị trạng thái online hoặc last seen
+    private void listenForOnlineStatus() {
         FirebaseUtil.allUserCollectionReference()
                 .document(otherUser.getUserId())
                 .addSnapshotListener((snapshot, error) -> {
                     if (snapshot != null && snapshot.exists()) {
-                        boolean isOnline = snapshot.getBoolean("online") != null && snapshot.getBoolean("online");
+                        boolean isOnline = Boolean.TRUE.equals(snapshot.getBoolean("online"));
                         if (isOnline) {
                             onlineStatus.setText("Online");
                             onlineStatus.setTextColor(getResources().getColor(R.color.light_green));
@@ -172,8 +195,7 @@ public class ChatActivity extends AppCompatActivity {
                         } else {
                             Timestamp lastSeen = snapshot.getTimestamp("lastSeen");
                             if (lastSeen != null) {
-                                String time = FirebaseUtil.timestampToString(lastSeen);
-                                onlineStatus.setText("Last seen: " + time);
+                                onlineStatus.setText("Last seen: " + FirebaseUtil.timestampToString(lastSeen));
                                 onlineStatus.setTextColor(getResources().getColor(R.color.gray));
                                 onlineStatus.setCompoundDrawablesWithIntrinsicBounds(R.drawable.icon_clock_gray, 0, 0, 0);
                                 onlineStatus.setVisibility(View.VISIBLE);
@@ -183,276 +205,372 @@ public class ChatActivity extends AppCompatActivity {
                         }
                     }
                 });
-
-
-
-
-
-    // Xử lý sự kiện nhấn nút gửi tin nhắn
-        sendMessageBtn.setOnClickListener((v -> {
-            // Lấy nội dung tin nhắn và xóa khoảng trắng thừa
-            String message = messageInput.getText().toString().trim();
-            // Nếu tin nhắn rỗng, không làm gì
-            if (message.isEmpty())
-                return;
-            // Gửi tin nhắn
-            sendMessageToUser(message);
-        }));
-
-        // Lấy hoặc tạo mới phòng chat
-        getOrCreateChatroomModel();
-        // Thiết lập RecyclerView để hiển thị tin nhắn
-        setupChatRecyclerView();
     }
 
-    // Hàm thiết lập RecyclerView để hiển thị danh sách tin nhắn
-    void setupChatRecyclerView() {
-        // Tạo truy vấn Firebase để lấy tin nhắn theo thời gian, sắp xếp giảm dần
-        Query query = FirebaseUtil.getChatroomMessageReference(chatroomId)
-                .orderBy("timestamp", Query.Direction.DESCENDING);
+    private void getOrCreateChatroomModel() {
+        DocumentReference chatroomRef;
+        if (isGroupChat) {
+            chatroomRef = FirebaseUtil.getGroupChatroomReference(currentChatroomId);
+        } else {
+            chatroomRef = FirebaseUtil.getChatroomReference(currentChatroomId);
+        }
 
-        // Tạo FirestoreRecyclerOptions để liên kết truy vấn với ChatMessageModel
-        FirestoreRecyclerOptions<ChatMessageModel> options = new FirestoreRecyclerOptions.Builder<ChatMessageModel>()
-                .setQuery(query, ChatMessageModel.class).build();
+        chatroomRef.get().addOnCompleteListener(task -> {
+            if (task.isSuccessful()) {
+                currentChatroomModel = task.getResult().toObject(ChatroomModel.class);
+                if (currentChatroomModel == null) {
+                    Log.d("ChatActivity", "Creating new chatroom/group model: " + currentChatroomId);
+                    currentChatroomModel = new ChatroomModel();
+                    currentChatroomModel.setChatroomId(currentChatroomId);
+                    currentChatroomModel.setLastMessage("");
+                    currentChatroomModel.setLastMessageTimestamp(null);
+                    if (isGroupChat) {
+                        currentChatroomModel.setMemberIds(new ArrayList<>(Arrays.asList(FirebaseUtil.currentUserId())));
+                        currentChatroomModel.setGroupName("New Group Name");
+                        currentChatroomModel.setIsGroupChat(true);
+                    } else {
+                        currentChatroomModel.setMemberIds(Arrays.asList(
+                                FirebaseUtil.currentUserId(),
+                                otherUser.getUserId()
+                        ));
+                        currentChatroomModel.setGroupName(null);
+                        currentChatroomModel.setIsGroupChat(false);
+                    }
+                    chatroomRef.set(currentChatroomModel)
+                            .addOnSuccessListener(aVoid -> Log.d("ChatActivity", "Chatroom/Group model created successfully."))
+                            .addOnFailureListener(e -> Log.e("ChatActivity", "Error creating chatroom/group model: " + e.getMessage()));
+                } else {
+                    Log.d("ChatActivity", "Chatroom/Group model already exists: " + currentChatroomId);
+                    if (isGroupChat && currentChatroomModel.getGroupName() != null && !currentChatroomModel.getGroupName().isEmpty()) {
+                        otherUsername.setText(currentChatroomModel.getGroupName());
+                    }
+                }
+            } else {
+                Log.e("ChatActivity", "Error getting chatroom/group model: " + task.getException().getMessage());
+                Toast.makeText(this, "Lỗi khi tải dữ liệu chat.", Toast.LENGTH_LONG).show();
+                finish();
+            }
+        });
+    }
 
-        // Khởi tạo adapter với dữ liệu từ Firestore
+
+    private void setupChatRecyclerView() {
+        Query query;
+        if (isGroupChat) {
+            query = FirebaseUtil.getGroupChatroomMessageReference(currentChatroomId)
+                    .orderBy("timestamp", Query.Direction.DESCENDING);
+        } else {
+            query = FirebaseUtil.getChatroomMessageReference(currentChatroomId)
+                    .orderBy("timestamp", Query.Direction.DESCENDING);
+        }
+
+        FirestoreRecyclerOptions<ChatMessageModel> options =
+                new FirestoreRecyclerOptions.Builder<ChatMessageModel>()
+                        .setQuery(query, ChatMessageModel.class).build();
+
         adapter = new ChatRecyclerAdapter(options, getApplicationContext());
-        // Thiết lập LinearLayoutManager với bố cục đảo ngược (tin nhắn mới nhất ở dưới)
         LinearLayoutManager manager = new LinearLayoutManager(this);
-        manager.setReverseLayout(true);
+        manager.setReverseLayout(true); // Display latest messages at the bottom
         recyclerView.setLayoutManager(manager);
-        // Gán adapter cho RecyclerView
         recyclerView.setAdapter(adapter);
-        // Bắt đầu lắng nghe dữ liệu từ Firestore
         adapter.startListening();
-        // Tự động cuộn đến tin nhắn mới nhất khi có tin nhắn mới
+
         adapter.registerAdapterDataObserver(new RecyclerView.AdapterDataObserver() {
             @Override
             public void onItemRangeInserted(int positionStart, int itemCount) {
-                super.onItemRangeInserted(positionStart, itemCount);
                 recyclerView.smoothScrollToPosition(0);
             }
         });
     }
-    private void uploadImageToImgBB(Uri imageUri) {
-        try {
-            InputStream inputStream = getContentResolver().openInputStream(imageUri);
-            byte[] imageBytes = new byte[inputStream.available()];
-            inputStream.read(imageBytes);
-            String encodedImage = Base64.encodeToString(imageBytes, Base64.DEFAULT);
 
-            OkHttpClient client = new OkHttpClient();
-            RequestBody requestBody = new FormBody.Builder()
-                    .add("key", "f8c48e870cff1f6cb6c43a1b9633ac9a") // 👉 thay bằng API Key của bạn
-                    .add("image", encodedImage)
-                    .build();
-
-            Request request = new Request.Builder()
-                    .url("https://api.imgbb.com/1/upload")
-                    .post(requestBody)
-                    .build();
-
-            client.newCall(request).enqueue(new Callback() {
-                @Override
-                public void onFailure(@NonNull Call call, @NonNull IOException e) {
-                    runOnUiThread(() -> Toast.makeText(ChatActivity.this, "Lỗi upload ảnh", Toast.LENGTH_SHORT).show());
-                }
-
-                @Override
-                public void onResponse(@NonNull Call call, @NonNull okhttp3.Response response) throws IOException {
-                    try {
-                        String responseBody = response.body().string();
-                        JSONObject jsonObject = new JSONObject(responseBody);
-                        String imageUrl = jsonObject.getJSONObject("data").getString("url");
-                        runOnUiThread(() -> sendImageMessage(imageUrl));
-                    } catch (Exception e) {
-                        runOnUiThread(() -> Toast.makeText(ChatActivity.this, "Lỗi phản hồi ImgBB", Toast.LENGTH_SHORT).show());
-                    }
-                }
-            });
-
-        } catch (IOException e) {
-            Toast.makeText(this, "Không đọc được ảnh", Toast.LENGTH_SHORT).show();
+    private void sendMessage(String message, String imageUrl) {
+        if (currentChatroomModel == null) {
+            Log.e("ChatActivity", "ChatroomModel is null, cannot send message.");
+            Toast.makeText(this, "Lỗi: Không thể gửi tin nhắn. Chatroom chưa được tải.", Toast.LENGTH_SHORT).show();
+            return;
         }
-    }
+        if (message == null || (message.isEmpty() && imageUrl == null)) {
+            Log.d("ChatActivity", "Message and imageUrl are both empty/null. Not sending.");
+            return;
+        }
 
 
-    private void sendImageMessage(String imageUrl) {
-        // ✅ Cập nhật thông tin chatroom trước khi gửi ảnh
-        chatroomModel.setLastMessageTimestamp(Timestamp.now());
-        chatroomModel.setLastMessageSenderId(FirebaseUtil.currentUserId());
-        chatroomModel.setLastMessage("📷 Sent a photo");
+        DocumentReference chatroomDocRef;
+        CollectionReference messagesCollectionRef;
 
-        // ✅ Gửi ảnh như cũ
-        ChatMessageModel chatMessage = new ChatMessageModel("photo", FirebaseUtil.currentUserId(), Timestamp.now());
-        chatMessage.setImageUrl(imageUrl);
-        FirebaseUtil.getChatroomMessageReference(chatroomId)
-                .add(chatMessage)
-                .addOnSuccessListener(docRef -> {
-                    sendNotification("📷 Sent a photo");
-                })
-                .addOnFailureListener(e -> {
-                    Log.e("SEND_IMG", "Lỗi khi gửi ảnh", e);
-                    Toast.makeText(this, "Không gửi được ảnh", Toast.LENGTH_SHORT).show();
-                });
-    }
+        if (isGroupChat) {
+            chatroomDocRef = FirebaseUtil.getGroupChatroomReference(currentChatroomId);
+            messagesCollectionRef = FirebaseUtil.getGroupChatroomMessageReference(currentChatroomId);
+        } else {
+            chatroomDocRef = FirebaseUtil.getChatroomReference(currentChatroomId);
+            messagesCollectionRef = FirebaseUtil.getChatroomMessageReference(currentChatroomId);
+        }
 
 
+        Map<String, Object> updates = new HashMap<>();
+        updates.put("lastMessageTimestamp", FieldValue.serverTimestamp());
+        updates.put("lastMessageSenderId", FirebaseUtil.currentUserId());
+        updates.put("lastMessage", message != null ? message : "[Hình ảnh]");
 
-    void sendMessageToUser(String message) {
-        // Cập nhật thông tin phòng chat
-        chatroomModel.setLastMessageTimestamp(Timestamp.now());
-        chatroomModel.setLastMessageSenderId(FirebaseUtil.currentUserId());
-        chatroomModel.setLastMessage(message);
+        chatroomDocRef.update(updates)
+                .addOnFailureListener(e -> Log.e("FIRESTORE", "Lỗi cập nhật chatroom model: " + e.getMessage(), e));
 
-        FirebaseUtil.getChatroomReference(chatroomId).set(chatroomModel)
-                .addOnFailureListener(e -> Log.e("FIRESTORE", "Lỗi cập nhật chatroom", e));
 
-        // Tạo tin nhắn mới
-        ChatMessageModel chatMessageModel = new ChatMessageModel(message, FirebaseUtil.currentUserId(), Timestamp.now());
+        ChatMessageModel chatMessageModel = new ChatMessageModel(
+                message, FirebaseUtil.currentUserId(), Timestamp.now(), imageUrl);
 
-        FirebaseUtil.getChatroomMessageReference(chatroomId)
-                .add(chatMessageModel)
+        messagesCollectionRef.add(chatMessageModel)
                 .addOnSuccessListener(docRef -> {
                     messageInput.setText("");
-                    sendNotification(message);
-                    Log.d("SEND_MSG", "Gửi thành công");
+                    Log.d("SEND_MSG", "Gửi thành công: " + (isGroupChat ? "nhóm" : "1-1")); // Successfully sent: group/1-1
+                    // Only send notifications for 1-1 chats (FCM for groups is more complex)
+                    if (!isGroupChat) {
+                        sendNotification(message != null ? message : "[Hình ảnh]"); // Send notification content
+                    }
                 })
                 .addOnFailureListener(e -> {
-                    Log.e("SEND_MSG", "Lỗi khi gửi tin nhắn", e);
-                    Toast.makeText(ChatActivity.this, "Không gửi được tin nhắn", Toast.LENGTH_SHORT).show();
+                    Log.e("SEND_MSG", "Lỗi khi gửi tin nhắn: " + e.getMessage(), e); // Error sending message
+                    Toast.makeText(ChatActivity.this, "Không gửi được tin nhắn", Toast.LENGTH_SHORT).show(); // Could not send message
                 });
     }
 
-
-    // Hàm lấy hoặc tạo mới phòng chat trong Firestore
-    void getOrCreateChatroomModel() {
-        // Lấy thông tin phòng chat từ Firestore
-        FirebaseUtil.getChatroomReference(chatroomId).get().addOnCompleteListener(task -> {
-            if (task.isSuccessful()) {
-                // Chuyển dữ liệu Firestore thành ChatroomModel
-                chatroomModel = task.getResult().toObject(ChatroomModel.class);
-                if (chatroomModel == null) {
-                    // Nếu phòng chat chưa tồn tại, tạo mới
-                    chatroomModel = new ChatroomModel(
-                            chatroomId,
-                            Arrays.asList(FirebaseUtil.currentUserId(), otherUser.getUserId()),
-                            Timestamp.now(),
-                            ""
-                    );
-                    // Lưu phòng chat mới vào Firestore
-                    FirebaseUtil.getChatroomReference(chatroomId).set(chatroomModel);
-                }
-            }
-        });
+    private void selectImage() {
+        Intent intent = new Intent(Intent.ACTION_GET_CONTENT);
+        intent.setType("image/*");
+        startActivityForResult(intent, 101);
     }
-    void sendNotification(String message){
+
+    @Override
+    protected void onActivityResult(int requestCode, int resultCode, Intent data) {
+        super.onActivityResult(requestCode, resultCode, data);
+        if (requestCode == 101 && resultCode == RESULT_OK && data != null && data.getData() != null) {
+            Uri imageUri = data.getData();
+            uploadImage(imageUri);
+        } else {
+            Log.d("ChatActivity", "Image selection cancelled or failed. RequestCode: " + requestCode + ", ResultCode: " + resultCode);
+        }
+    }
+
+    private void uploadImage(Uri uri) {
+        if (currentChatroomId == null) {
+            Toast.makeText(this, "Lỗi: Không thể tải ảnh. Chatroom chưa được tải.", Toast.LENGTH_SHORT).show(); // Error: Cannot upload image. Chatroom not loaded.
+            return;
+        }
+
+        // Define the storage path for the image in Firebase Storage
+        String imagePath;
+        if (isGroupChat) {
+            imagePath = "group_chat_images/" + currentChatroomId + "/" + UUID.randomUUID().toString();
+        } else {
+            imagePath = "one_to_one_chat_images/" + currentChatroomId + "/" + UUID.randomUUID().toString();
+        }
+
+        FirebaseUtil.getStorageReference(imagePath).putFile(uri)
+                .addOnSuccessListener(taskSnapshot -> {
+                    taskSnapshot.getStorage().getDownloadUrl().addOnSuccessListener(downloadUri -> {
+                        sendMessage(null, downloadUri.toString()); // Send image URL, message is null
+                    }).addOnFailureListener(e -> Log.e("UPLOAD_IMAGE", "Failed to get download URL: " + e.getMessage()));
+                })
+                .addOnFailureListener(e -> {
+                    Log.e("UPLOAD_IMAGE", "Image upload failed: " + e.getMessage());
+                    Toast.makeText(ChatActivity.this, "Tải ảnh thất bại", Toast.LENGTH_SHORT).show(); // Image upload failed
+                });
+    }
+
+    //endregion
+
+    //region --- FCM Notification Handling ---
+
+    private void sendNotification(String message) {
+        // Only send notifications for 1-1 chats in this case (FCM for groups is more complex)
+        if (isGroupChat) {
+            Log.d("NOTIFY_FCM", "Skipping FCM notification for group chat.");
+            return;
+        }
 
         FirebaseUtil.currentUserDetails().get().addOnCompleteListener(task -> {
-            if(task.isSuccessful()){
+            if (task.isSuccessful()) {
                 UserModel currentUser = task.getResult().toObject(UserModel.class);
-                try{
-                    JSONObject jsonObject  = new JSONObject();
-
+                if (currentUser == null || otherUser == null || otherUser.getFcmToken() == null) {
+                    Log.e("NOTIFY_FCM", "Missing current user, other user, or FCM token for notification.");
+                    return;
+                }
+                try {
+                    JSONObject jsonObject = new JSONObject();
                     JSONObject notificationObj = new JSONObject();
-                    notificationObj.put("title",currentUser.getUsername());
-                    notificationObj.put("body",message);
+                    notificationObj.put("title", currentUser.getUsername());
+                    notificationObj.put("body", message);
 
                     JSONObject dataObj = new JSONObject();
-                    dataObj.put("userId",currentUser.getUserId());
+                    dataObj.put("userId", currentUser.getUserId());
+                    dataObj.put("chatroomId", currentChatroomId); // Pass chatroomId to open the correct chat
+                    dataObj.put("isGroupChat", isGroupChat); // Pass isGroupChat flag
+                    AndroidUtils.passUserModelAsJsonObject(dataObj, otherUser); // Pass otherUser info (for opening chat)
 
-                    jsonObject.put("notification",notificationObj);
-                    jsonObject.put("data",dataObj);
-                    jsonObject.put("to",otherUser.getFcmToken());
+                    jsonObject.put("notification", notificationObj);
+                    jsonObject.put("data", dataObj);
+                    jsonObject.put("to", otherUser.getFcmToken());
 
                     callApi(jsonObject);
-
-
-                }catch (Exception e){
-
+                } catch (Exception e) {
+                    Log.e("NOTIFY_FCM", "Error creating JSON for notification: " + e.getMessage(), e);
                 }
-
+            } else {
+                Log.e("NOTIFY_FCM", "Failed to get current user details: " + task.getException().getMessage());
             }
         });
-
-    }
-    // chọn ảnh từ thu viện
-    private void openImagePicker() {
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
-            if (ContextCompat.checkSelfPermission(this, Manifest.permission.READ_MEDIA_IMAGES)
-                    != PackageManager.PERMISSION_GRANTED) {
-                ActivityCompat.requestPermissions(this,
-                        new String[]{Manifest.permission.READ_MEDIA_IMAGES}, REQUEST_PERMISSION);
-                return;
-            }
-        } else {
-            if (ContextCompat.checkSelfPermission(this, Manifest.permission.READ_EXTERNAL_STORAGE)
-                    != PackageManager.PERMISSION_GRANTED) {
-                ActivityCompat.requestPermissions(this,
-                        new String[]{Manifest.permission.READ_EXTERNAL_STORAGE}, REQUEST_PERMISSION);
-                return;
-            }
-        }
-
-        Intent intent = new Intent(Intent.ACTION_PICK, MediaStore.Images.Media.EXTERNAL_CONTENT_URI);
-        intent.setType("image/*");
-        imagePickerLauncher.launch(intent);  // ✅ dùng launcher thay vì startActivityForResult
     }
 
-    @Override
-    protected void onActivityResult(int requestCode, int resultCode, @Nullable Intent data) {
-        super.onActivityResult(requestCode, resultCode, data);
-
-        if (requestCode == REQUEST_IMAGE_PICK && resultCode == RESULT_OK && data != null) {
-            selectedImageUri = data.getData();
-            if (selectedImageUri != null) {
-                uploadImageToImgBB(selectedImageUri);
-
-            }
-        }
-    }
-
-    @Override
-    public void onRequestPermissionsResult(int requestCode, @NonNull String[] permissions, @NonNull int[] grantResults) {
-        super.onRequestPermissionsResult(requestCode, permissions, grantResults);
-        if (requestCode == REQUEST_PERMISSION) {
-            if (grantResults.length > 0 && grantResults[0] == PackageManager.PERMISSION_GRANTED) {
-                openImagePicker();
-            } else {
-                Toast.makeText(this, "Bạn cần cấp quyền để chọn ảnh", Toast.LENGTH_SHORT).show();
-            }
-        }
-    }
-
-
-
-
-    void callApi(JSONObject jsonObject){
+    private void callApi(JSONObject jsonObject) {
         MediaType JSON = MediaType.get("application/json; charset=utf-8");
         OkHttpClient client = new OkHttpClient();
         String url = "https://fcm.googleapis.com/fcm/send";
-        RequestBody body = RequestBody.create(jsonObject.toString(),JSON);
+        RequestBody body = RequestBody.create(jsonObject.toString(), JSON);
         Request request = new Request.Builder()
                 .url(url)
                 .post(body)
-                .header("Authorization","Bearer YOUR_API_KEY")
+                .header("Authorization", "Bearer YOUR_SERVER_KEY") // <<< REPLACE WITH YOUR SERVER KEY >>>
                 .build();
+
         client.newCall(request).enqueue(new Callback() {
             @Override
             public void onFailure(@NonNull Call call, @NonNull IOException e) {
-                Log.e("NOTIFY_API", "Gửi thông báo thất bại", e);
+                Log.e("NOTIFY_API", "Gửi thông báo thất bại: " + e.getMessage(), e); // Notification sending failed
             }
-            @Override
-            public void onResponse(@NonNull okhttp3.Call call, @NonNull okhttp3.Response response) throws IOException {
-                Log.d("NOTIFY_API", "Gửi thông báo thành công");
 
+            @Override
+            public void onResponse(@NonNull Call call, @NonNull Response response) throws IOException {
+                if (response.isSuccessful()) {
+                    Log.d("NOTIFY_API", "Gửi thông báo thành công: " + response.body().string()); // Notification sent successfully
+                } else {
+                    Log.e("NOTIFY_API", "Gửi thông báo thất bại: " + response.code() + " " + response.message() + " " + response.body().string()); // Notification sending failed
+                }
+            }
+        });
+    }
+
+    //endregion
+
+    //region --- New Group Creation and Member Addition ---
+    private void showCreateGroupDialog() {
+        AlertDialog.Builder builder = new AlertDialog.Builder(this);
+        builder.setTitle("Tạo nhóm mới"); // Create New Group
+
+        final EditText input = new EditText(this);
+        input.setHint("Nhập tên nhóm"); // Enter group name
+        builder.setView(input);
+
+        builder.setPositiveButton("Tạo", (dialog, which) -> { // Create
+            String groupName = input.getText().toString().trim();
+            if (!groupName.isEmpty()) {
+                createNewGroup(groupName);
+            } else {
+                Toast.makeText(this, "Tên nhóm không được để trống", Toast.LENGTH_SHORT).show(); // Group name cannot be empty
             }
         });
 
+        builder.setNegativeButton("Hủy", (dialog, which) -> dialog.dismiss()); // Cancel
+        builder.show();
     }
 
+    private void createNewGroup(String groupName) {
+        // Create an initial list containing only the current user
+        List<String> members = new ArrayList<>();
+        members.add(FirebaseUtil.currentUserId());
+
+        // If you are in a 1-1 chat and want to create a group with that person, add them
+        // `isGroupChat` here will still be `false` because we are creating a group FROM a 1-1 chat.
+        if (!isGroupChat && otherUser != null) {
+            members.add(otherUser.getUserId());
+        }
+
+        Map<String, Object> groupData = new HashMap<>();
+        groupData.put("groupName", groupName);
+        groupData.put("memberIds", members);
+        groupData.put("createdAt", FieldValue.serverTimestamp()); // Use FieldValue.serverTimestamp()
+        groupData.put("lastMessage", "Nhóm \"" + groupName + "\" đã được tạo."); // Group "[groupName]" has been created.
+        groupData.put("lastMessageSenderId", FirebaseUtil.currentUserId());
+        groupData.put("lastMessageTimestamp", FieldValue.serverTimestamp()); // Use FieldValue.serverTimestamp()
+        groupData.put("isGroupChat", true); // Always set isGroupChat = true when creating a new group
 
 
+        FirebaseUtil.getChatroomsCollection() // Use getChatroomsCollection() for both 1-1 and groups if you store them together
+                .add(groupData)
+                .addOnSuccessListener(documentReference -> {
+                    String newChatroomId = documentReference.getId();
+                    Log.d("ChatActivity", "New group created with ID: " + newChatroomId);
 
+                    // Send the first message announcing the group creation
+                    FirebaseUtil.getGroupChatroomMessageReference(newChatroomId) // Use a separate function for group messages
+                            .add(new ChatMessageModel(
+                                    "Nhóm \"" + groupName + "\" đã được tạo.", // Group "[groupName]" has been created.
+                                    FirebaseUtil.currentUserId(),
+                                    Timestamp.now() // Use Timestamp.now() for immediate message
+                            ));
 
+                    // After creating the group, you can decide:
+                    // 1. Navigate to AddMemberActivity to continue adding members.
+                    Intent intent = new Intent(this, AddMemberActivity.class);
+                    intent.putExtra("chatroomId", newChatroomId); // Pass the ID of the new group
+                    startActivity(intent);
+                    finish(); // Finish the current ChatActivity
+
+                    // OR
+                    // 2. Navigate directly to the ChatActivity of the newly created group.
+                    /*
+                    Intent intent = new Intent(this, ChatActivity.class);
+                    intent.putExtra("GROUP_ID", newChatroomId);
+                    intent.putExtra("IS_GROUP_CHAT", true);
+                    startActivity(intent);
+                    finish();
+                    */
+                })
+                .addOnFailureListener(e -> {
+                    Log.e("ChatActivity", "Failed to create new group: " + e.getMessage());
+                    Toast.makeText(this, "Tạo nhóm thất bại: " + e.getMessage(), Toast.LENGTH_SHORT).show(); // Group creation failed
+                });
+    }
+
+    private void openSelectGroupActivity() {
+        // This function doesn't seem to be used directly from ChatActivity in the current logic.
+        // If it's meant to navigate to another group from a list of groups, you would need to pass that group's ID.
+        Intent intent = new Intent(this, SelectGroupActivity.class); // Assuming SelectGroupActivity has a list of groups to choose from
+        startActivity(intent);
+    }
+
+    //endregion
+
+    @Override
+    protected void onStart() {
+        super.onStart();
+        if (adapter != null) {
+            adapter.startListening();
+        }
+    }
+
+    @Override
+    protected void onStop() {
+        super.onStop();
+        if (adapter != null) {
+            adapter.stopListening();
+        }
+    }
+
+    @Override
+    protected void onResume() {
+        super.onResume();
+        // Update online status
+        if (FirebaseUtil.currentUserId() != null) {
+            FirebaseUtil.currentUserDetails().update("online", true);
+        }
+    }
+
+    @Override
+    protected void onPause() {
+        super.onPause();
+        // Update offline status and lastSeen
+        if (FirebaseUtil.currentUserId() != null) {
+            FirebaseUtil.currentUserDetails().update("online", false, "lastSeen", Timestamp.now());
+        }
+    }
 }

@@ -5,4 +5,15 @@
     <item name="right_chat_layout" type="id" />
     <item name="left_chat_textview" type="id" />
     <item name="right_chat_textview" type="id" />
+    <item name="txtUserName" type="id" />
+    <item name="checkBox" type="id" />
+    <item name="btnCreateGroup" type="id" />
+    <item name="tv_username" type="id" />
+    <item name="checkbox" type="id" />
+    <item name="txtSender" type="id" />
+    <item name="textMessage" type="id" />
+    <item name="imageMessage" type="id" />
+    <item name="add_member_btn" type="id" />
+    <item name="friend_username" type="id" />
+    <item name="friend_checkbox" type="id" />
 </resources>

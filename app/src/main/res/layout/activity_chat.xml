@@ -16,6 +16,7 @@
         android:orientation="horizontal"
         android:gravity="center_vertical">
 
+        <!-- Nút quay lại -->
         <ImageButton
             android:id="@+id/back_btn"
             android:layout_width="32dp"
@@ -24,12 +25,14 @@
             android:background="?attr/selectableItemBackgroundBorderless"
             app:tint="@color/white" />
 
+        <!-- Avatar -->
         <include
             layout="@layout/profile_pic_view"
             android:layout_width="48dp"
             android:layout_height="48dp"
             android:layout_marginStart="10dp" />
 
+        <!-- Thông tin người dùng -->
         <LinearLayout
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
@@ -56,8 +59,23 @@
                 android:drawablePadding="4dp"
                 android:visibility="visible" />
         </LinearLayout>
-    </LinearLayout>
 
+        <!-- Khoảng trống đẩy nút về bên phải -->
+        <View
+            android:layout_width="0dp"
+            android:layout_height="1dp"
+            android:layout_weight="1" />
+
+        <!-- Nút thêm nhóm -->
+        <ImageButton
+            android:id="@+id/add_group_btn"
+            android:layout_width="36dp"
+            android:layout_height="36dp"
+            android:src="@drawable/ic_add_member"
+            android:background="?attr/selectableItemBackgroundBorderless"
+            android:contentDescription="Thêm nhóm"
+            app:tint="@color/white" />
+    </LinearLayout>
 
     <!-- Danh sách tin nhắn -->
     <androidx.recyclerview.widget.RecyclerView

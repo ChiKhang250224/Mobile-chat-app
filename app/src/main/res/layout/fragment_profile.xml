@@ -9,14 +9,15 @@
     android:layout_margin="20dp">
 
     <ImageView
+        android:id="@+id/profile_image_view"
         android:layout_width="160dp"
         android:layout_height="160dp"
         android:background="@drawable/circular_bg"
         android:backgroundTint="@color/my_primary"
         android:src="@drawable/person_icon"
         android:scaleType="centerCrop"
-        android:layout_marginBottom="40dp"
-        android:id="@+id/profile_image_view"/>
+        android:layout_marginBottom="40dp"/>
+
 
     <EditText
         android:layout_width="match_parent"

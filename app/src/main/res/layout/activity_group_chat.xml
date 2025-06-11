@@ -1,0 +1,109 @@
+<?xml version="1.0" encoding="utf-8"?>
+<RelativeLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    xmlns:tools="http://schemas.android.com/tools"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    tools:context=".GroupChatActivity"> <LinearLayout
+    android:id="@+id/toolbar"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:background="@color/my_primary"
+    android:padding="10dp"
+    android:orientation="horizontal"
+    android:gravity="center_vertical">
+
+    <ImageButton
+        android:id="@+id/back_btn"
+        android:layout_width="32dp"
+        android:layout_height="32dp"
+        android:src="@drawable/icon_back"
+        android:background="?attr/selectableItemBackgroundBorderless"
+        app:tint="@color/white"
+        android:contentDescription="Quay lại" />
+
+    <include
+        layout="@layout/profile_pic_view"
+        android:id="@+id/profile_pic_layout" android:layout_width="48dp"
+        android:layout_height="48dp"
+        android:layout_marginStart="10dp" />
+
+    <LinearLayout
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:orientation="vertical"
+        android:layout_marginStart="10dp">
+
+        <TextView
+            android:id="@+id/group_name_text_view" android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="Tên Nhóm" android:textSize="18sp"
+            android:textStyle="bold"
+            android:textColor="@color/white" />
+
+        <TextView
+            android:id="@+id/group_members_status" android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="3 thành viên" android:textSize="12sp"
+            android:textColor="@color/light_green"
+            android:visibility="visible" /> </LinearLayout>
+
+    <View
+        android:layout_width="0dp"
+        android:layout_height="1dp"
+        android:layout_weight="1" />
+
+    <ImageButton
+        android:id="@+id/add_member_to_group_btn" android:layout_width="36dp"
+        android:layout_height="36dp"
+        android:src="@drawable/ic_add_member" android:background="?attr/selectableItemBackgroundBorderless"
+        android:contentDescription="Thêm thành viên"
+        app:tint="@color/white" />
+</LinearLayout>
+
+    <androidx.recyclerview.widget.RecyclerView
+        android:id="@+id/recyclerViewMessages" android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:layout_below="@id/toolbar"
+        android:layout_above="@id/bottom_layout" />
+
+    <RelativeLayout
+        android:id="@+id/bottom_layout"
+        android:layout_width="match_parent"
+        android:layout_height="80dp"
+        android:layout_alignParentBottom="true"
+        android:padding="8dp">
+
+        <ImageButton
+            android:id="@+id/btnSendImage" android:layout_width="40dp"
+            android:layout_height="40dp"
+            android:layout_alignParentStart="true"
+            android:layout_centerVertical="true"
+            android:src="@android:drawable/ic_menu_gallery"
+            android:background="?attr/selectableItemBackgroundBorderless"
+            app:tint="@color/my_primary"
+            android:padding="6dp"
+            android:contentDescription="Send Image" />
+
+        <EditText
+            android:id="@+id/edtMessage" android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_centerInParent="true"
+            android:layout_toEndOf="@id/btnSendImage"
+            android:layout_toStartOf="@id/btnSend" android:layout_marginStart="8dp"
+            android:layout_marginEnd="8dp"
+            android:background="@drawable/edit_text_rounded_corner" android:elevation="4dp"
+            android:hint="Nhập tin nhắn..."
+            android:padding="10dp" />
+
+        <ImageButton
+            android:id="@+id/btnSend" android:layout_width="48dp"
+            android:layout_height="48dp"
+            android:layout_alignParentEnd="true"
+            android:layout_centerInParent="true"
+            android:src="@drawable/icon_send" android:background="?attr/selectableItemBackgroundBorderless"
+            app:tint="@color/my_primary"
+            android:padding="8dp" />
+    </RelativeLayout>
+
+</RelativeLayout>

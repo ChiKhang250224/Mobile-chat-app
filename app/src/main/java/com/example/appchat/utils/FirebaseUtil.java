@@ -2,6 +2,8 @@ package com.example.appchat.utils;
 
 // Nhập các thư viện Firebase và Java cần thiết
 
+import android.view.Menu;
+
 import com.google.firebase.Timestamp;
 import com.google.firebase.auth.FirebaseAuth;
 import com.google.firebase.firestore.CollectionReference;
@@ -11,6 +13,7 @@ import com.google.firebase.storage.FirebaseStorage;
 import com.google.firebase.storage.StorageReference;
 
 import java.text.SimpleDateFormat;
+import java.util.ArrayList;
 import java.util.List;
 
 // Lớp tiện ích để xử lý các thao tác liên quan đến Firebase
@@ -65,15 +68,18 @@ public class FirebaseUtil {
     }
 
     // Lấy thông tin người dùng khác từ danh sách userIds của phòng chat
-    public static DocumentReference getOtherUserFromChatroom(List<String> userIds) {
-        // Nếu userId đầu tiên là người dùng hiện tại, trả về người dùng thứ hai
-        if (userIds.get(0).equals(FirebaseUtil.currentUserId())) {
-            return allUserCollectionReference().document(userIds.get(1));
-        } else {
-            // Ngược lại, trả về người dùng đầu tiên
-            return allUserCollectionReference().document(userIds.get(0));
+    public static List<DocumentReference> getOtherUserFromChatroom(List<String> userIds) {
+        List<DocumentReference> otherRefs = new ArrayList<>();
+        String current = currentUserId();
+        if (userIds == null) return otherRefs;
+        for (String uid : userIds) {
+            if (uid != null && !uid.equals(current)) {
+                otherRefs.add(allUserCollectionReference().document(uid));
+            }
         }
+        return otherRefs;
     }
+
 
     // Chuyển đổi Timestamp thành chuỗi thời gian (giờ:phút)
     public static String timestampToString(Timestamp timestamp) {
@@ -97,5 +103,21 @@ public class FirebaseUtil {
                 .child(otherUserId);
     }
 
+
+    public static CollectionReference getChatroomsCollection() {
+        return FirebaseFirestore.getInstance().collection("chatrooms");
+    }
+    // Trong FirebaseUtil.java
+    public static DocumentReference getGroupChatroomReference(String chatroomId) {
+        return FirebaseFirestore.getInstance().collection("groups").document(chatroomId);
+    }
+
+    public static CollectionReference getGroupChatroomMessageReference(String chatroomId) {
+        return getGroupChatroomReference(chatroomId).collection("messages");
+    }
+
+    public static StorageReference getStorageReference(String path) {
+        return FirebaseStorage.getInstance().getReference(path);
+    }
 
 }

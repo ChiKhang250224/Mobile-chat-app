@@ -20,6 +20,7 @@ import android.widget.ImageView;
 import android.widget.ProgressBar;
 import android.widget.TextView;
 
+import com.bumptech.glide.Glide;
 import com.example.appchat.R;
 import com.example.appchat.SplashActivity;
 import com.example.appchat.model.UserModel;
@@ -55,6 +56,7 @@ public class ProfileFragment extends Fragment {
     @Override
     public void onCreate(@Nullable Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
+
         imagePickLauncher = registerForActivityResult(new ActivityResultContracts.StartActivityForResult(),
                 result -> {
                     if(result.getResultCode() == Activity.RESULT_OK){
@@ -78,6 +80,16 @@ public class ProfileFragment extends Fragment {
         updateProfileBtn = view.findViewById(R.id.profle_update_btn);
         progressBar = view.findViewById(R.id.profile_progress_bar);
         logoutBtn = view.findViewById(R.id.logout_btn);
+
+        String avatarUrl = "https://your-image-url.com/avatar.jpg"; // hoặc lấy từ SharedPreferences
+        if (avatarUrl != null && !avatarUrl.isEmpty()) {
+            Glide.with(this)
+                    .load(avatarUrl)
+                    .placeholder(R.drawable.ic_avatar_placeholder) // ảnh mặc định khi tải
+
+                    .circleCrop()
+                    .into(profilePic);
+        }
 
         getUserData();
 
