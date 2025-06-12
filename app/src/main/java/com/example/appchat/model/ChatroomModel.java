@@ -14,6 +14,8 @@ public class ChatroomModel {
     private String groupName;
     private boolean isGroupChat;
 
+    private Timestamp createdAt;
+
     public ChatroomModel() { }
 
 
@@ -37,4 +39,12 @@ public class ChatroomModel {
 
     public boolean getIsGroupChat() { return isGroupChat; }
     public void setIsGroupChat(boolean groupChat) { isGroupChat = groupChat; }
+
+    public Timestamp getCreatedAt() {
+        return createdAt;
+    }
+
+    public void setCreatedAt(Timestamp createdAt) {
+        this.createdAt = createdAt;
+    }
 }

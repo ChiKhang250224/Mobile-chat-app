@@ -14,6 +14,8 @@ import com.google.firebase.storage.StorageReference;
 
 import java.text.SimpleDateFormat;
 import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.Collections;
 import java.util.List;
 
 // Lớp tiện ích để xử lý các thao tác liên quan đến Firebase
@@ -54,12 +56,12 @@ public class FirebaseUtil {
 
     // Tạo ID phòng chat dựa trên hai ID người dùng
     public static String getChatroomId(String userId1, String userId2) {
-        // Sắp xếp để đảm bảo ID phòng chat luôn nhất quán (ID nhỏ hơn đứng trước)
-        if (userId1.hashCode() < userId2.hashCode()) {
-            return userId1 + "_" + userId2;
-        } else {
-            return userId2 + "_" + userId1;
-        }
+        // Sắp xếp ID để đảm bảo chatroomId luôn giống nhau cho cùng một cặp người dùng
+        List<String> userIds = Arrays.asList(userId1, userId2);
+        Collections.sort(userIds); // Sắp xếp theo bảng chữ cái
+
+        // Ghép các ID lại với nhau
+        return userIds.get(0) + "_" + userIds.get(1);
     }
 
     // Lấy tham chiếu đến bộ sưu tập tất cả phòng chat trong Firestore
@@ -109,7 +111,7 @@ public class FirebaseUtil {
     }
     // Trong FirebaseUtil.java
     public static DocumentReference getGroupChatroomReference(String chatroomId) {
-        return FirebaseFirestore.getInstance().collection("groups").document(chatroomId);
+        return getChatroomsCollection().document(chatroomId);
     }
 
     public static CollectionReference getGroupChatroomMessageReference(String chatroomId) {
