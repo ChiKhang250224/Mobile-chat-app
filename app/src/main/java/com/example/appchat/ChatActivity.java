@@ -418,10 +418,151 @@ public class ChatActivity extends AppCompatActivity {
 
         adapter = new ChatRecyclerAdapter(options, getApplicationContext());
         LinearLayoutManager manager = new LinearLayoutManager(this);
-        manager.setReverseLayout(true); // Display latest messages at the bottom
+        manager.setReverseLayout(true);
         recyclerView.setLayoutManager(manager);
         recyclerView.setAdapter(adapter);
         adapter.startListening();
+
+        // Đăng ký listener cho sự kiện nhấn giữ tin nhắn
+        adapter.setOnMessageLongClickListener((message, documentId, position) -> {
+            showMessageOptionsDialog(message, documentId);
+        });
+
+        adapter.registerAdapterDataObserver(new RecyclerView.AdapterDataObserver() {
+            @Override
+            public void onItemRangeChanged(int positionStart, int itemCount) {
+                super.onItemRangeChanged(positionStart, itemCount);
+                recyclerView.smoothScrollToPosition(0);
+            }
+
+            @Override
+            public void onItemRangeInserted(int positionStart, int itemCount) {
+                super.onItemRangeInserted(positionStart, itemCount);
+                recyclerView.smoothScrollToPosition(0);
+            }
+        });
+    }
+
+    private void showMessageOptionsDialog(ChatMessageModel message, String documentId) {
+        AlertDialog.Builder builder = new AlertDialog.Builder(this);
+        builder.setTitle("Tùy chọn tin nhắn");
+
+        List<String> options = new ArrayList<>();
+        if (message.isRecalled()) {
+            // Tin nhắn đã bị thu hồi, chỉ cho phép xóa
+            options.add("Xóa");
+        } else if (message.getSenderId().equals(FirebaseUtil.currentUserId())) {
+            // Tin nhắn của người dùng hiện tại
+            if (message.getImageUrl() == null || message.getImageUrl().isEmpty()) {
+                options.add("Chỉnh sửa");
+            }
+            options.add("Thu hồi");
+            options.add("Xóa");
+        } else {
+            // Tin nhắn của người khác
+            options.add("Xóa");
+        }
+
+        builder.setItems(options.toArray(new String[0]), (dialog, which) -> {
+            String selectedOption = options.get(which);
+            if (selectedOption.equals("Chỉnh sửa")) {
+                showEditMessageDialog(message, documentId);
+            } else if (selectedOption.equals("Thu hồi")) {
+                recallMessage(documentId);
+            } else if (selectedOption.equals("Xóa")) {
+                deleteMessage(documentId);
+            }
+        });
+
+        builder.setNegativeButton("Hủy", (dialog, which) -> dialog.dismiss());
+        builder.show();
+    }
+
+    private void showEditMessageDialog(ChatMessageModel message, String documentId) {
+        AlertDialog.Builder builder = new AlertDialog.Builder(this);
+        builder.setTitle("Chỉnh sửa tin nhắn");
+
+        final EditText input = new EditText(this);
+        input.setText(message.getMessage());
+        builder.setView(input);
+
+        builder.setPositiveButton("Lưu", (dialog, which) -> {
+            String newMessage = input.getText().toString().trim();
+            if (!newMessage.isEmpty()) {
+                editMessage(documentId, newMessage);
+            } else {
+                Toast.makeText(this, "Tin nhắn không được để trống", Toast.LENGTH_SHORT).show();
+            }
+        });
+
+        builder.setNegativeButton("Hủy", (dialog, which) -> dialog.dismiss());
+        builder.show();
+    }
+
+    private void editMessage(String documentId, String newMessage) {
+        CollectionReference messagesCollectionRef = isGroupChat ?
+                FirebaseUtil.getGroupChatroomMessageReference(currentChatroomId) :
+                FirebaseUtil.getChatroomMessageReference(currentChatroomId);
+
+        messagesCollectionRef.document(documentId)
+                .update("message", newMessage)
+                .addOnSuccessListener(aVoid -> {
+                    Toast.makeText(this, "Chỉnh sửa tin nhắn thành công", Toast.LENGTH_SHORT).show();
+                    updateLastMessage(newMessage);
+                })
+                .addOnFailureListener(e -> {
+                    Log.e(TAG, "Lỗi chỉnh sửa tin nhắn: " + e.getMessage());
+                    Toast.makeText(this, "Chỉnh sửa tin nhắn thất bại", Toast.LENGTH_SHORT).show();
+                });
+    }
+
+    private void recallMessage(String documentId) {
+        CollectionReference messagesCollectionRef = isGroupChat ?
+                FirebaseUtil.getGroupChatroomMessageReference(currentChatroomId) :
+                FirebaseUtil.getChatroomMessageReference(currentChatroomId);
+
+        messagesCollectionRef.document(documentId)
+                .update("recalled", true, "message", "", "imageUrl", null)
+                .addOnSuccessListener(aVoid -> {
+                    messagesCollectionRef.document(documentId)
+                            .update("message", "Tin nhắn đã được thu hồi");
+                    Toast.makeText(this, "Thu hồi tin nhắn thành công", Toast.LENGTH_SHORT).show();
+                    updateLastMessage("Đã thu hồi một tin nhắn");
+                })
+                .addOnFailureListener(e -> {
+                    Log.e(TAG, "Lỗi thu hồi tin nhắn: " + e.getMessage());
+                    Toast.makeText(this, "Thu hồi tin nhắn thất bại", Toast.LENGTH_SHORT).show();
+                });
+    }
+
+    private void deleteMessage(String documentId) {
+        CollectionReference messagesCollectionRef = isGroupChat ?
+                FirebaseUtil.getGroupChatroomMessageReference(currentChatroomId) :
+                FirebaseUtil.getChatroomMessageReference(currentChatroomId);
+
+        messagesCollectionRef.document(documentId)
+                .update("deletedBy", FieldValue.arrayUnion(FirebaseUtil.currentUserId()))
+                .addOnSuccessListener(aVoid -> {
+                    Toast.makeText(this, "Xóa tin nhắn thành công", Toast.LENGTH_SHORT).show();
+                })
+                .addOnFailureListener(e -> {
+                    Log.e(TAG, "Lỗi xóa tin nhắn: " + e.getMessage());
+                    Toast.makeText(this, "Xóa tin nhắn thất bại", Toast.LENGTH_SHORT).show();
+                });
+    }
+
+    private void updateLastMessage(String message) {
+        DocumentReference chatroomDocRef = isGroupChat ?
+                FirebaseUtil.getGroupChatroomReference(currentChatroomId) :
+                FirebaseUtil.getChatroomReference(currentChatroomId);
+
+        Map<String, Object> updates = new HashMap<>();
+        updates.put("lastMessageTimestamp", FieldValue.serverTimestamp());
+        updates.put("lastMessageSenderId", FirebaseUtil.currentUserId());
+        updates.put("lastMessage", message);
+
+        chatroomDocRef.update(updates)
+                .addOnFailureListener(e -> Log.e(TAG, "Lỗi cập nhật lastMessage: " + e.getMessage()));
     }
 
 
@@ -469,16 +610,6 @@ public class ChatActivity extends AppCompatActivity {
                     // Only send notifications for 1-1 chats (FCM for groups is more complex)
                     if (!isGroupChat) {
                         sendNotification(message != null ? message : "[Hình ảnh]"); // Send notification content
-                    }
-                    // Di chuyển RecyclerView đến cuối để hiển thị tin nhắn mới
-                    // CHỈ CUỘN KHI ADAPTER ĐÃ CÓ DỮ LIỆU
-                    if (adapter != null && adapter.getItemCount() > 0) {
-                        // Delay cuộn một chút để FirestoreRecyclerAdapter kịp cập nhật
-                        recyclerView.postDelayed(() -> {
-                            recyclerView.smoothScrollToPosition(adapter.getItemCount() - 1);
-                        }, 300); // Khoảng 300ms
-                    } else {
-                        Log.d(TAG, "Adapter is null or empty, cannot scroll to position.");
                     }
                 })
                 .addOnFailureListener(e -> {
