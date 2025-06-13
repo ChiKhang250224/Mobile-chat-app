@@ -1,5 +1,6 @@
 package com.example.appchat;
 
+import android.app.ProgressDialog;
 import android.content.Intent;
 import android.net.Uri;
 import android.os.Bundle;
@@ -13,6 +14,7 @@ import androidx.recyclerview.widget.RecyclerView;
 
 import com.example.appchat.adapter.MessageAdapter;
 import com.example.appchat.model.ChatMessageModel;
+import com.example.appchat.utils.ImgBBUploader;
 import com.google.firebase.auth.FirebaseAuth;
 import com.google.firebase.firestore.DocumentSnapshot;
 import com.google.firebase.firestore.FieldValue;
@@ -113,11 +115,26 @@ public class GroupChatActivity extends AppCompatActivity {
     }
 
     private void uploadImage(Uri uri) {
-        StorageReference ref = FirebaseStorage.getInstance().getReference("group_images/" + UUID.randomUUID());
-        ref.putFile(uri).addOnSuccessListener(task -> {
-            ref.getDownloadUrl().addOnSuccessListener(downloadUri -> {
-                sendMessage(null, downloadUri.toString());
-            });
+        ProgressDialog progressDialog = new ProgressDialog(this);
+        progressDialog.setMessage("Đang tải ảnh lên..."); // "Uploading image..."
+        progressDialog.show();
+
+        ImgBBUploader.uploadImage(this, uri, new ImgBBUploader.UploadCallback() {
+            @Override
+            public void onSuccess(String imageUrl) {
+                progressDialog.dismiss();
+                // Tin nhắn ảnh đã được tải lên ImgBB thành công, bây giờ gửi URL vào chat
+                sendMessage(null, imageUrl); // Gửi tin nhắn chứa URL ảnh ImgBB
+                Toast.makeText(GroupChatActivity.this, "Tải ảnh thành công!", Toast.LENGTH_SHORT).show(); // "Image uploaded successfully!"
+            }
+
+            @Override
+            public void onFailure(String errorMessage) {
+                progressDialog.dismiss();
+                // Xử lý lỗi khi tải ảnh lên ImgBB
+                Toast.makeText(GroupChatActivity.this, "Tải ảnh thất bại: " + errorMessage, Toast.LENGTH_LONG).show(); // "Image upload failed:"
+                Log.e("GroupChatActivity", "Lỗi tải ảnh lên ImgBB: " + errorMessage); // "ImgBB upload error:"
+            }
         });
     }
 }

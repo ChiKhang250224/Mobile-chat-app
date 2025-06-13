@@ -93,18 +93,6 @@ public class FirebaseUtil {
         FirebaseAuth.getInstance().signOut();
     }
 
-    // Lấy tham chiếu đến ảnh đại diện của người dùng hiện tại trong Firebase Storage
-    public static StorageReference getCurrentProfilePicStorageRef() {
-        return FirebaseStorage.getInstance().getReference().child("profile_pic")
-                .child(FirebaseUtil.currentUserId());
-    }
-
-    // Lấy tham chiếu đến ảnh đại diện của người dùng khác trong Firebase Storage
-    public static StorageReference getOtherProfilePicStorageRef(String otherUserId) {
-        return FirebaseStorage.getInstance().getReference().child("profile_pic")
-                .child(otherUserId);
-    }
-
 
     public static CollectionReference getChatroomsCollection() {
         return FirebaseFirestore.getInstance().collection("chatrooms");
@@ -118,8 +106,5 @@ public class FirebaseUtil {
         return getGroupChatroomReference(chatroomId).collection("messages");
     }
 
-    public static StorageReference getStorageReference(String path) {
-        return FirebaseStorage.getInstance().getReference(path);
-    }
 
 }

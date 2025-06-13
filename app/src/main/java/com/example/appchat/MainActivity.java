@@ -2,6 +2,7 @@ package com.example.appchat;
 
 import android.content.Intent;
 import android.os.Bundle;
+import android.util.Log;
 import android.view.MenuItem;
 import android.widget.ImageButton;
 
@@ -71,6 +72,7 @@ public class MainActivity extends AppCompatActivity {
         FirebaseMessaging.getInstance().getToken().addOnCompleteListener(task -> {
             if(task.isSuccessful()){
                 String token = task.getResult();
+                Log.e("My Token", token);
                 FirebaseUtil.currentUserDetails().update("fcmToken",token);
 
             }

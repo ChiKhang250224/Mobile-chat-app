@@ -1,14 +1,22 @@
 package com.example.appchat;
 
+import static androidx.constraintlayout.helper.widget.MotionEffect.TAG;
+
+import androidx.activity.result.ActivityResultLauncher;
+import androidx.activity.result.contract.ActivityResultContracts;
 import androidx.annotation.NonNull;
 import androidx.appcompat.app.AlertDialog;
 import androidx.appcompat.app.AppCompatActivity;
 import androidx.recyclerview.widget.LinearLayoutManager;
 import androidx.recyclerview.widget.RecyclerView;
 
+import android.Manifest;
+import android.app.ProgressDialog;
 import android.content.Intent;
+import android.content.pm.PackageManager;
 import android.net.Uri;
 import android.os.Bundle;
+import android.util.Base64;
 import android.util.Log;
 import android.view.View;
 import android.widget.EditText;
@@ -17,25 +25,32 @@ import android.widget.ImageView;
 import android.widget.TextView;
 import android.widget.Toast;
 
+import com.bumptech.glide.Glide;
+import com.bumptech.glide.request.RequestOptions;
 import com.example.appchat.adapter.ChatRecyclerAdapter;
 import com.example.appchat.model.ChatMessageModel;
 import com.example.appchat.model.ChatroomModel;
 import com.example.appchat.model.UserModel;
 import com.example.appchat.utils.AndroidUtils;
 import com.example.appchat.utils.FirebaseUtil;
+import com.example.appchat.utils.ImgBBUploader;
 import com.firebase.ui.firestore.FirestoreRecyclerOptions;
 import com.google.firebase.Timestamp;
 import com.google.firebase.firestore.CollectionReference;
 import com.google.firebase.firestore.DocumentReference;
 import com.google.firebase.firestore.FieldValue;
 import com.google.firebase.firestore.Query;
-import com.google.firebase.storage.FirebaseStorage;
-import com.google.firebase.storage.StorageReference;
 
+import android.os.Build; // Thêm dòng này để dùng Build.VERSION.SDK_INT
+import androidx.core.content.ContextCompat; // Thêm dòng này
+import androidx.core.app.ActivityCompat; // Thêm dòng này
 
+import org.json.JSONException;
 import org.json.JSONObject;
 
+import java.io.ByteArrayOutputStream;
 import java.io.IOException;
+import java.io.InputStream;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.HashMap;
@@ -46,6 +61,7 @@ import java.util.UUID;
 import okhttp3.Call;
 import okhttp3.Callback;
 import okhttp3.MediaType;
+import okhttp3.MultipartBody;
 import okhttp3.OkHttpClient;
 import okhttp3.RequestBody;
 import okhttp3.Request;
@@ -63,10 +79,18 @@ public class ChatActivity extends AppCompatActivity {
 
     // UI elements
     EditText messageInput;
-    ImageButton sendMessageBtn, backBtn, sendImageBtn, addMemberBtn;
+    ImageButton sendMessageBtn, backBtn, sendImageBtn, addMemberBtn, messageSendBtn;
     TextView otherUsername, onlineStatus;
     ImageView profilePicImageView;
     RecyclerView recyclerView;
+
+
+    private EditText chatMessageInput;
+    private ActivityResultLauncher<Intent> imagePickerLauncher; // Cho cách mới để chọn ảnh
+
+    // Hằng số cho quyền (tùy chọn, nhưng là một thực hành tốt)
+    private static final int PERMISSION_REQUEST_CODE = 1001;
+
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -81,7 +105,8 @@ public class ChatActivity extends AppCompatActivity {
         recyclerView = findViewById(R.id.chat_recycler_view);
         profilePicImageView = findViewById(R.id.profile_pic_image_view);
         onlineStatus = findViewById(R.id.online_status);
-        addMemberBtn = findViewById(R.id.add_group_btn); // This button can now be used for both creating and adding members
+        addMemberBtn = findViewById(R.id.add_group_btn);
+        sendImageBtn = findViewById(R.id.send_image_btn); // Dòng này
 
         // Retrieve IS_GROUP_CHAT flag and IDs/Models from Intent
         isGroupChat = getIntent().getBooleanExtra("IS_GROUP_CHAT", false); // Default to false (1-1)
@@ -115,16 +140,17 @@ public class ChatActivity extends AppCompatActivity {
                 Log.e("ChatActivity", "Other user was null for 1-1 chat.");
                 finish();
                 return;
-            }
-            // For 1-1 chat, create the chatroomId based on the IDs of the two users
-            currentChatroomId = FirebaseUtil.getChatroomId(FirebaseUtil.currentUserId(), otherUser.getUserId());
-            Log.d("ChatActivity", "Opening 1-1 Chat with ID: " + currentChatroomId + " and user: " + otherUser.getUsername());
-            setupOneToOneUI(otherUser);
+            }else {
+                // For 1-1 chat, create the chatroomId based on the IDs of the two users
+                currentChatroomId = FirebaseUtil.getChatroomId(FirebaseUtil.currentUserId(), otherUser.getUserId());
+                Log.d("ChatActivity", "Opening 1-1 Chat with ID: " + currentChatroomId + " and user: " + otherUser.getUsername());
+                setupOneToOneUI(otherUser);
 
-            // Always show the addMemberBtn
-            addMemberBtn.setVisibility(View.VISIBLE);
-            // Set the icon for creating a new group when in a 1-1 chat
-            addMemberBtn.setImageResource(R.drawable.ic_add_member);
+                // Always show the addMemberBtn
+                addMemberBtn.setVisibility(View.VISIBLE);
+                // Set the icon for creating a new group when in a 1-1 chat
+                addMemberBtn.setImageResource(R.drawable.ic_add_member);
+            }
         }
 
         // --- Common logic for both chat types ---
@@ -143,13 +169,27 @@ public class ChatActivity extends AppCompatActivity {
         sendMessageBtn.setOnClickListener(v -> {
             String message = messageInput.getText().toString().trim();
             if (!message.isEmpty()) {
-                sendMessage(message, null);
+                sendMessage(message, null); // Gửi tin nhắn văn bản
+                messageInput.setText(""); // Xóa input sau khi gửi
+            } else {
+                AndroidUtils.showToast(this, "Vui lòng nhập tin nhắn."); // Đã bỏ phần "hoặc chọn ảnh"
             }
         });
 
-        // Send image button
-        sendImageBtn = findViewById(R.id.send_image_btn);
-        sendImageBtn.setOnClickListener(v -> selectImage());
+        imagePickerLauncher = registerForActivityResult(
+                new ActivityResultContracts.StartActivityForResult(),
+                result -> {
+                    if (result.getResultCode() == RESULT_OK && result.getData() != null) {
+                        Uri imageUri = result.getData().getData();
+                        uploadImageToImgBB(imageUri); // Tải lên ảnh đã chọn
+                    } else {
+                        AndroidUtils.showToast(this, "Không có ảnh nào được chọn.");
+                    }
+                }
+        );
+        sendImageBtn.setOnClickListener(v -> {
+            checkAndRequestPermissions(); // Kiểm tra quyền trước khi mở trình chọn ảnh
+        });
 
         // Set Listener for the "Add Member" / "Create Group" button (addMemberBtn)
         addMemberBtn.setOnClickListener(v -> {
@@ -169,7 +209,72 @@ public class ChatActivity extends AppCompatActivity {
         setupChatRecyclerView();
     }
 
-    //region --- Setup UI and Data for 1-1 and Group Chats ---
+    private void checkAndRequestPermissions() {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) { // Android 13+
+            if (ContextCompat.checkSelfPermission(this, Manifest.permission.READ_MEDIA_IMAGES) != PackageManager.PERMISSION_GRANTED) {
+                ActivityCompat.requestPermissions(this, new String[]{Manifest.permission.READ_MEDIA_IMAGES}, PERMISSION_REQUEST_CODE);
+            } else {
+                openImagePicker();
+            }
+        } else { // Các phiên bản Android cũ hơn
+            if (ContextCompat.checkSelfPermission(this, Manifest.permission.READ_EXTERNAL_STORAGE) != PackageManager.PERMISSION_GRANTED) {
+                ActivityCompat.requestPermissions(this, new String[]{Manifest.permission.READ_EXTERNAL_STORAGE}, PERMISSION_REQUEST_CODE);
+            } else {
+                openImagePicker();
+            }
+        }
+    }
+
+    @Override
+    public void onRequestPermissionsResult(int requestCode, @NonNull String[] permissions, @NonNull int[] grantResults) {
+        super.onRequestPermissionsResult(requestCode, permissions, grantResults);
+        if (requestCode == PERMISSION_REQUEST_CODE) {
+            if (grantResults.length > 0 && grantResults[0] == PackageManager.PERMISSION_GRANTED) {
+                openImagePicker();
+            } else {
+                AndroidUtils.showToast(this, "Quyền truy cập ảnh đã bị từ chối.");
+            }
+        }
+    }
+
+    private void openImagePicker() {
+        Intent intent = new Intent(Intent.ACTION_PICK);
+        intent.setType("image/*");
+        imagePickerLauncher.launch(intent);
+    }
+    // Trong ChatActivity.java
+    private void uploadImageToImgBB(Uri imageUri) {
+        if (imageUri == null) {
+            AndroidUtils.showToast(this, "Không có ảnh để tải lên.");
+            return;
+        }
+
+        ProgressDialog progressDialog = new ProgressDialog(this);
+        progressDialog.setMessage("Đang tải ảnh lên...");
+        progressDialog.show();
+
+        // Sử dụng ImgBBUploader class để xử lý logic tải lên
+        ImgBBUploader.uploadImage(this, imageUri, new ImgBBUploader.UploadCallback() {
+            @Override
+            public void onSuccess(String imageUrl) {
+                progressDialog.dismiss();
+                runOnUiThread(() -> { // Đảm bảo chạy trên UI thread
+                    AndroidUtils.showToast(ChatActivity.this, "Tải ảnh lên thành công!");
+                    Log.d(TAG, "ImgBB Image URL: " + imageUrl);
+                    sendMessage(null, imageUrl); // Gửi tin nhắn sau khi tải lên thành công
+                });
+            }
+
+            @Override
+            public void onFailure(String errorMessage) {
+                progressDialog.dismiss();
+                runOnUiThread(() -> { // Đảm bảo chạy trên UI thread
+                    AndroidUtils.showToast(ChatActivity.this, "Tải ảnh thất bại: " + errorMessage);
+                    Log.e(TAG, "Lỗi tải ảnh lên ImgBB: " + errorMessage);
+                });
+            }
+        });
+    }
 
     private void loadGroupInfoAndSetupUI(String groupId) {
         FirebaseUtil.getGroupChatroomReference(groupId).addSnapshotListener((documentSnapshot, e) -> {
@@ -201,19 +306,23 @@ public class ChatActivity extends AppCompatActivity {
         });
     }
 
-    private void setupOneToOneUI(UserModel user) {
-        otherUsername.setText(user.getUsername());
-        // Load the other user's profile picture
-        FirebaseUtil.getOtherProfilePicStorageRef(user.getUserId()).getDownloadUrl()
-                .addOnCompleteListener(t -> {
-                    if (t.isSuccessful()) {
-                        Uri uri = t.getResult();
-                        AndroidUtils.setProfilePic(this, uri, profilePicImageView);
-                    } else {
-                        profilePicImageView.setImageResource(R.drawable.ic_avatar_placeholder);
-                    }
-                });
-        // onlineStatus will be handled by listenForOnlineStatus()
+    private void setupOneToOneUI(UserModel userModel) {
+        otherUsername.setText(userModel.getUsername());
+
+        // Tải ảnh đại diện trực tiếp từ UserModel (Firestore)
+        String profileImageUrl = userModel.getProfilePicUrl();
+        if (profileImageUrl != null && !profileImageUrl.isEmpty()) {
+            Glide.with(this)
+                    .load(profileImageUrl)
+                    .apply(RequestOptions.circleCropTransform())
+                    .placeholder(R.drawable.default_profile_pic) // Ảnh tạm thời khi đang tải
+                    .error(R.drawable.default_profile_pic) // Ảnh khi tải lỗi hoặc không tìm thấy
+                    .into(profilePicImageView); // Sử dụng profilePicImageView
+        } else {
+            // Nếu không có URL ảnh đại diện, hiển thị ảnh mặc định
+            profilePicImageView.setImageResource(R.drawable.default_profile_pic);
+        }
+        // onlineStatus.setVisibility(View.VISIBLE); // Hiển thị trạng thái online/offline
     }
 
     private void listenForOnlineStatus() {
@@ -313,28 +422,18 @@ public class ChatActivity extends AppCompatActivity {
         recyclerView.setLayoutManager(manager);
         recyclerView.setAdapter(adapter);
         adapter.startListening();
-
-        adapter.registerAdapterDataObserver(new RecyclerView.AdapterDataObserver() {
-            @Override
-            public void onItemRangeInserted(int positionStart, int itemCount) {
-                recyclerView.smoothScrollToPosition(0);
-            }
-        });
     }
 
-    //endregion
-
-    //region --- Sending Messages and Images ---
 
     private void sendMessage(String message, String imageUrl) {
         if (currentChatroomModel == null) {
-            Log.e("ChatActivity", "ChatroomModel is null, cannot send message.");
-            Toast.makeText(this, "Lỗi: Không thể gửi tin nhắn. Chatroom chưa được tải.", Toast.LENGTH_SHORT).show(); // Error: Cannot send message. Chatroom not loaded.
+            Log.e(TAG, "ChatroomModel is null, cannot send message.");
+            Toast.makeText(this, "Lỗi: Không thể gửi tin nhắn. Chatroom chưa được tải.", Toast.LENGTH_SHORT).show();
             return;
         }
         // Check if both message and image URL are empty/null, then don't send
-        if (message == null || (message.isEmpty() && imageUrl == null)) {
-            Log.d("ChatActivity", "Message and imageUrl are both empty/null. Not sending.");
+        if ((message == null || message.isEmpty()) && (imageUrl == null || imageUrl.isEmpty())) {
+            Log.d(TAG, "Message and imageUrl are both empty/null. Not sending.");
             return;
         }
 
@@ -357,7 +456,7 @@ public class ChatActivity extends AppCompatActivity {
         updates.put("lastMessage", message != null ? message : "[Hình ảnh]"); // Update last message to "[Image]" if only an image
 
         chatroomDocRef.update(updates) // Use update instead of set to avoid overwriting the entire model
-                .addOnFailureListener(e -> Log.e("FIRESTORE", "Lỗi cập nhật chatroom model: " + e.getMessage(), e));
+                .addOnFailureListener(e -> Log.e(TAG, "Lỗi cập nhật chatroom model: " + e.getMessage(), e));
 
         // Create and send message
         ChatMessageModel chatMessageModel = new ChatMessageModel(
@@ -366,74 +465,25 @@ public class ChatActivity extends AppCompatActivity {
         messagesCollectionRef.add(chatMessageModel)
                 .addOnSuccessListener(docRef -> {
                     messageInput.setText(""); // Clear input after sending
-                    Log.d("SEND_MSG", "Gửi thành công: " + (isGroupChat ? "nhóm" : "1-1")); // Successfully sent: group/1-1
+                    Log.d(TAG, "Gửi thành công: " + (isGroupChat ? "nhóm" : "1-1")); // Successfully sent: group/1-1
                     // Only send notifications for 1-1 chats (FCM for groups is more complex)
                     if (!isGroupChat) {
                         sendNotification(message != null ? message : "[Hình ảnh]"); // Send notification content
                     }
+                    // Di chuyển RecyclerView đến cuối để hiển thị tin nhắn mới
+                    // CHỈ CUỘN KHI ADAPTER ĐÃ CÓ DỮ LIỆU
+                    if (adapter != null && adapter.getItemCount() > 0) {
+                        // Delay cuộn một chút để FirestoreRecyclerAdapter kịp cập nhật
+                        recyclerView.postDelayed(() -> {
+                            recyclerView.smoothScrollToPosition(adapter.getItemCount() - 1);
+                        }, 300); // Khoảng 300ms
+                    } else {
+                        Log.d(TAG, "Adapter is null or empty, cannot scroll to position.");
+                    }
                 })
                 .addOnFailureListener(e -> {
-                    Log.e("SEND_MSG", "Lỗi khi gửi tin nhắn: " + e.getMessage(), e); // Error sending message
+                    Log.e(TAG, "Lỗi khi gửi tin nhắn: " + e.getMessage(), e); // Error sending message
                     Toast.makeText(ChatActivity.this, "Không gửi được tin nhắn", Toast.LENGTH_SHORT).show(); // Could not send message
-                });
-    }
-
-    private void selectImage() {
-        Intent intent = new Intent(Intent.ACTION_GET_CONTENT);
-        intent.setType("image/*");
-        startActivityForResult(intent, 101);
-    }
-
-    @Override
-    protected void onActivityResult(int requestCode, int resultCode, Intent data) {
-        super.onActivityResult(requestCode, resultCode, data);
-        if (requestCode == 101 && resultCode == RESULT_OK && data != null && data.getData() != null) {
-            Uri imageUri = data.getData();
-            uploadImage(imageUri);
-        } else {
-            Log.d("ChatActivity", "Image selection cancelled or failed. RequestCode: " + requestCode + ", ResultCode: " + resultCode);
-        }
-    }
-
-    private void uploadImage(Uri uri) {
-        if (currentChatroomId == null) {
-            Toast.makeText(this, "Lỗi: Không thể tải ảnh. Chatroom chưa được tải.", Toast.LENGTH_SHORT).show();
-            return;
-        }
-
-        String imagePath;
-        if (isGroupChat) {
-            imagePath = "group_chat_images/" + currentChatroomId + "/" + UUID.randomUUID().toString();
-        } else {
-            imagePath = "one_to_one_chat_images/" + currentChatroomId + "/" + UUID.randomUUID().toString();
-        }
-
-        // Lấy StorageReference
-        StorageReference imageRef = FirebaseUtil.getStorageReference(imagePath); // Đảm bảo FirebaseUtil.getStorageReference đúng
-
-        Log.d("UPLOAD_IMAGE", "Attempting to upload image to path: " + imagePath); // Log đường dẫn tải lên
-
-        imageRef.putFile(uri)
-                .addOnSuccessListener(taskSnapshot -> {
-                    Log.d("UPLOAD_IMAGE", "Image upload SUCCESS for path: " + imagePath); // Log thành công tải lên
-                    Log.d("UPLOAD_IMAGE", "Bytes transferred: " + taskSnapshot.getBytesTransferred() + "/" + taskSnapshot.getTotalByteCount());
-
-                    // LẤY URL TẢI XUỐNG CHỈ KHI TẢI LÊN THÀNH CÔNG
-                    taskSnapshot.getStorage().getDownloadUrl()
-                            .addOnSuccessListener(downloadUri -> {
-                                Log.d("UPLOAD_IMAGE", "Download URL obtained: " + downloadUri.toString());
-                                sendMessage(null, downloadUri.toString()); // Gửi URL ảnh
-                            })
-                            .addOnFailureListener(e -> {
-                                // LỖI KHI LẤY URL TẢI XUỐNG
-                                Log.e("UPLOAD_IMAGE", "Failed to get download URL after successful upload: " + e.getMessage(), e);
-                                Toast.makeText(ChatActivity.this, "Tải ảnh thất bại (lỗi lấy URL)", Toast.LENGTH_SHORT).show();
-                            });
-                })
-                .addOnFailureListener(e -> {
-                    // LỖI KHI TẢI LÊN
-                    Log.e("UPLOAD_IMAGE", "Image upload FAILED for path: " + imagePath + ". Error: " + e.getMessage(), e);
-                    Toast.makeText(ChatActivity.this, "Tải ảnh thất bại (lỗi tải lên)", Toast.LENGTH_SHORT).show();
                 });
     }
 
@@ -570,17 +620,8 @@ public class ChatActivity extends AppCompatActivity {
                     Intent intent = new Intent(this, AddMemberActivity.class);
                     intent.putExtra("chatroomId", newChatroomId); // Pass the ID of the new group
                     startActivity(intent);
-                    finish(); // Finish the current ChatActivity
-
-                    // OR
-                    // 2. Navigate directly to the ChatActivity of the newly created group.
-                    /*
-                    Intent intent = new Intent(this, ChatActivity.class);
-                    intent.putExtra("GROUP_ID", newChatroomId);
-                    intent.putExtra("IS_GROUP_CHAT", true);
-                    startActivity(intent);
                     finish();
-                    */
+
                 })
                 .addOnFailureListener(e -> {
                     Log.e("ChatActivity", "Failed to create new group: " + e.getMessage());

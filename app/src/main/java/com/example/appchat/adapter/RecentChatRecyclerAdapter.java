@@ -14,6 +14,8 @@ import android.widget.Toast;
 import androidx.annotation.NonNull;
 import androidx.recyclerview.widget.RecyclerView;
 
+import com.bumptech.glide.Glide;
+import com.bumptech.glide.request.RequestOptions;
 import com.example.appchat.ChatActivity; // Chỉ sử dụng ChatActivity
 // import com.example.appchat.GroupChatActivity; // Xóa bỏ dòng này
 import com.example.appchat.R;
@@ -67,22 +69,14 @@ public class RecentChatRecyclerAdapter
                 : Collections.emptyList();
 
         // Biến để lưu trữ UserModel của người dùng 1-1 (nếu có)
-        final UserModel[] otherUser = {null};
-        // Biến để xác định loại chat
-        boolean isGroupChat; // Mặc định là không phải nhóm
+        // **QUAN TRỌNG:** Biến này cần là final để có thể được truy cập trong lambda expression của listener
+        final UserModel[] otherUserContainer = {null}; // Sử dụng mảng để có thể gán giá trị bên trong callback
+
+        boolean isGroupChat;
 
         // --- Bắt đầu logic phân loại và cập nhật UI ---
 
-        // Ưu tiên kiểm tra chat nhóm trước nếu bạn có trường `isGroupChat` trong ChatroomModel
-        // if (model.getIsGroupChat()) { // Nếu bạn đã thêm trường isGroupChat vào model và Firestore
-        //     isGroupChat = true;
-        //     // Hiển thị tên nhóm và ảnh nhóm
-        //     String groupName = model.getGroupName();
-        //     holder.usernameText.setText((groupName != null && !groupName.trim().isEmpty()) ? groupName : "Group Chat");
-        //     holder.profilePic.setImageResource(R.drawable.chat_icon); // Hoặc tải ảnh nhóm
-        //     // Ẩn trạng thái online nếu có
-        //     // if (holder.onlineStatus != null) holder.onlineStatus.setVisibility(View.GONE);
-        // } else
+        // Kiểm tra chat nhóm trước
         if (memberIds.size() > 2 || FirebaseUtil.getOtherUserFromChatroom(memberIds).size() > 1) {
             // ===== Xử lý Chat nhóm dựa trên số lượng thành viên =====
             isGroupChat = true;
@@ -94,56 +88,106 @@ public class RecentChatRecyclerAdapter
             );
             // Thiết lập ảnh đại diện nhóm (ví dụ: một icon nhóm mặc định)
             holder.profilePic.setImageResource(R.drawable.chat_icon); // Đảm bảo bạn có icon_group_chat
+
             // Nếu có TextView cho trạng thái online, hãy ẩn nó đi cho nhóm
             // if (holder.onlineStatus != null) holder.onlineStatus.setVisibility(View.GONE);
 
+            // Thiết lập OnClickListener cho chat nhóm
+            holder.itemView.setOnClickListener(v -> {
+                Intent intent = new Intent(v.getContext(), ChatActivity.class);
+                intent.putExtra("GROUP_ID", model.getChatroomId());
+                intent.putExtra("IS_GROUP_CHAT", true); // Luôn là true cho nhóm
+                intent.setFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
+                v.getContext().startActivity(intent);
+            });
+
         } else if (memberIds.size() == 2) {
             // ===== Xử lý Chat 1-1 =====
-            isGroupChat = false; // Đảm bảo cờ là false
+            isGroupChat = false;
             List<DocumentReference> otherRefs =
                     FirebaseUtil.getOtherUserFromChatroom(memberIds);
 
-            // Fetch user info in a listener
-            // (You might want to refactor this to avoid nested listeners if performance is critical)
             if (otherRefs.size() == 1) {
                 otherRefs.get(0).get().addOnSuccessListener(doc -> {
-                    if (!doc.exists()) return;
-                    otherUser[0] = doc.toObject(UserModel.class);
-                    if (otherUser[0] == null) return;
+                    if (!doc.exists()) {
+                        Log.w("ChatAdapter", "Other user document not found for 1-1 chat.");
+                        holder.usernameText.setText("Người dùng không tồn tại");
+                        holder.profilePic.setImageResource(R.drawable.ic_avatar_placeholder);
+                        // Vẫn đặt listener để tránh crash nếu người dùng click
+                        holder.itemView.setOnClickListener(v -> {
+                            Toast.makeText(v.getContext(), "Lỗi: Không thể mở chat 1-1. Dữ liệu người dùng không tồn tại.", Toast.LENGTH_SHORT).show();
+                        });
+                        return;
+                    }
+                    // Lấy UserModel của người dùng khác
+                    UserModel fetchedOtherUser = doc.toObject(UserModel.class);
+                    if (fetchedOtherUser == null) {
+                        Log.w("ChatAdapter", "Fetched UserModel is null for 1-1 chat.");
+                        holder.usernameText.setText("Lỗi tải user");
+                        holder.profilePic.setImageResource(R.drawable.ic_avatar_placeholder);
+                        // Vẫn đặt listener để tránh crash nếu người dùng click
+                        holder.itemView.setOnClickListener(v -> {
+                            Toast.makeText(v.getContext(), "Lỗi: Không thể mở chat 1-1. Dữ liệu người dùng rỗng.", Toast.LENGTH_SHORT).show();
+                        });
+                        return;
+                    }
+                    otherUserContainer[0] = fetchedOtherUser; // Gán fetchedOtherUser vào container
 
                     // Cập nhật UI cho 1-1
-                    // Avatar
-                    FirebaseUtil.getOtherProfilePicStorageRef(otherUser[0].getUserId())
-                            .getDownloadUrl()
-                            .addOnSuccessListener(uri ->
-                                    AndroidUtils.setProfilePic(
-                                            holder.profilePic.getContext(),
-                                            uri,
-                                            holder.profilePic
-                                    )
-                            )
-                            .addOnFailureListener(e ->
-                                    holder.profilePic.setImageResource(
-                                            R.drawable.ic_avatar_placeholder
-                                    )
-                            );
+                    // Avatar - TẢI TỪ URL TRONG USERMODEL (sử dụng otherUserContainer[0])
+                    String profileImageUrl = otherUserContainer[0].getProfilePicUrl(); // Đã sửa từ fetchedOtherUser
+                    if (profileImageUrl != null && !profileImageUrl.isEmpty()) {
+                        Glide.with(holder.profilePic.getContext())
+                                .load(profileImageUrl)
+                                .apply(RequestOptions.circleCropTransform())
+                                .placeholder(R.drawable.default_profile_pic)
+                                .error(R.drawable.default_profile_pic)
+                                .into(holder.profilePic);
+                    } else {
+                        holder.profilePic.setImageResource(R.drawable.default_profile_pic);
+                    }
                     // Tên người dùng
-                    holder.usernameText.setText(otherUser[0].getUsername());
+                    holder.usernameText.setText(otherUserContainer[0].getUsername()); // Đã sửa từ otherUser[0]
+
                     // Hiển thị trạng thái online (nếu có TextView cho nó)
                     // if (holder.onlineStatus != null) holder.onlineStatus.setVisibility(View.VISIBLE);
                     // TODO: Cập nhật trạng thái online từ UserModel nếu có
+
+                    // ĐẶT LISTENER CHO ITEM VIEW TRONG PHẠM VI NÀY ĐỂ TRUY CẬP otherUserContainer[0] ĐÃ ĐƯỢC TẢI
+                    holder.itemView.setOnClickListener(v -> {
+                        Intent intent = new Intent(v.getContext(), ChatActivity.class);
+                        AndroidUtils.passUserModelAsIntent(intent, otherUserContainer[0]); // Sử dụng biến từ container
+                        intent.putExtra("IS_GROUP_CHAT", false); // Đảm bảo cờ là false cho 1-1
+                        intent.setFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
+                        v.getContext().startActivity(intent);
+                    });
+
                 }).addOnFailureListener(e -> {
                     Log.e("ChatAdapter", "Error fetching other user info: " + e.getMessage());
                     holder.usernameText.setText("Lỗi tải user");
                     holder.profilePic.setImageResource(R.drawable.ic_avatar_placeholder);
+                    // Dù lỗi, vẫn set click listener cơ bản để tránh crash nếu user click
+                    holder.itemView.setOnClickListener(v -> {
+                        Toast.makeText(v.getContext(), "Lỗi: Không thể mở chat 1-1 do tải dữ liệu lỗi.", Toast.LENGTH_SHORT).show();
+                    });
+                });
+            } else {
+                Log.w("ChatAdapter", "Could not find other user for 1-1 chat in memberIds: " + memberIds);
+                isGroupChat = false;
+                holder.usernameText.setText("Lỗi chat 1-1");
+                holder.profilePic.setImageResource(R.drawable.ic_avatar_placeholder);
+                holder.itemView.setOnClickListener(v -> {
+                    Toast.makeText(v.getContext(), "Lỗi: Không thể mở chat 1-1. Dữ liệu thành viên không hợp lệ.", Toast.LENGTH_SHORT).show();
                 });
             }
         } else {
-            isGroupChat = false;
-            // Fallback: trường hợp không xác định được loại chat (rất hiếm)
+            // Trường hợp không xác định được loại chat (rất hiếm hoặc lỗi logic)
+            isGroupChat = false; // Mặc định là không phải nhóm
             holder.usernameText.setText("Unknown Chat");
             holder.profilePic.setImageResource(R.drawable.ic_avatar_placeholder);
-            // if (holder.onlineStatus != null) holder.onlineStatus.setVisibility(View.GONE);
+            holder.itemView.setOnClickListener(v -> {
+                Toast.makeText(v.getContext(), "Lỗi: Không thể mở chat. Loại chat không xác định.", Toast.LENGTH_SHORT).show();
+            });
         }
 
         // --- Logic chung cho cả 1-1 và nhóm ---
@@ -165,31 +209,14 @@ public class RecentChatRecyclerAdapter
                 )
         );
 
-        // Thiết lập OnClickListener cho itemView (chung cho cả 1-1 và nhóm)
-        holder.itemView.setOnClickListener(v -> {
-            Intent intent = new Intent(v.getContext(), ChatActivity.class);
-
-            if (isGroupChat) {
-                // Đối với chat nhóm, truyền GROUP_ID
-                intent.putExtra("GROUP_ID", model.getChatroomId());
-            } else {
-                // Đối với chat 1-1, truyền UserModel của người kia
-                if (otherUser[0] != null) {
-                    AndroidUtils.passUserModelAsIntent(intent, otherUser[0]);
-                } else {
-                    // Xử lý trường hợp otherUser[0] chưa được tải kịp hoặc bị lỗi
-                    Log.e("ChatAdapter", "Error: otherUser is null for 1-1 chat. Cannot open ChatActivity.");
-                    Toast.makeText(v.getContext(), "Lỗi: Không thể mở chat 1-1. Vui lòng thử lại.", Toast.LENGTH_SHORT).show();
-                    return; // Ngăn không cho mở Intent nếu thiếu dữ liệu
-                }
-            }
-            // Thêm cờ để ChatActivity biết đây là nhóm hay 1-1
-            intent.putExtra("IS_GROUP_CHAT", isGroupChat);
-
-            intent.setFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
-            v.getContext().startActivity(intent);
-        });
+        // **LƯU Ý QUAN TRỌNG:**
+        // HÃY ĐẢM BẢO CHỈ CÓ MỘT holder.itemView.setOnClickListener ĐƯỢC THIẾT LẬP
+        // trong onBindViewHolder. Logic đã được điều chỉnh để mỗi khối if/else if/else
+        // thiết lập listener riêng của nó. Điều này ngăn chặn việc listener bị ghi đè
+        // và đảm bảo rằng listener được thiết lập với dữ liệu chính xác.
+        // Bạn không cần một holder.itemView.setOnClickListener chung ở cuối nữa.
     }
+
 
     @Override
     public ChatroomModelViewHolder onCreateViewHolder(ViewGroup parent, int viewType) {
