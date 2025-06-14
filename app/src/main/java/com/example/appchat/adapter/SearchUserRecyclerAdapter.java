@@ -2,6 +2,8 @@ package com.example.appchat.adapter;
 
 // Nhập các thư viện cần thiết cho RecyclerView, Firebase, và các thành phần giao diện
 
+import static android.view.View.VISIBLE;
+
 import android.content.Context;
 import android.content.Intent;
 import android.net.Uri;
@@ -27,20 +29,29 @@ public class SearchUserRecyclerAdapter extends FirestoreRecyclerAdapter<UserMode
 
     // Biến lưu trữ Context của ứng dụng
     Context context;
-
+    boolean searchByPhone; // Biến xác định loại tìm kiếm
     // Constructor nhận FirestoreRecyclerOptions và Context
-    public SearchUserRecyclerAdapter(@NonNull FirestoreRecyclerOptions<UserModel> options, Context context) {
+    public SearchUserRecyclerAdapter(@NonNull FirestoreRecyclerOptions<UserModel> options, Context context, boolean searchByPhone) {
         super(options); // Gọi constructor của lớp cha
         this.context = context; // Lưu Context để sử dụng
+        this.searchByPhone = searchByPhone;
     }
 
     // Gắn dữ liệu của UserModel vào ViewHolder
     @Override
     protected void onBindViewHolder(@NonNull UserModelViewHolder holder, int position, @NonNull UserModel model) {
+        // Hiển thị số điện thoại chỉ khi tìm kiếm theo số điện thoại
+        if (searchByPhone) {
+            // Hiển thị tên người dùng
+            holder.usernameText.setText(model.getUsername());
+            // Hiển thị số điện thoại
+            holder.phoneText.setVisibility(View.VISIBLE);
+            holder.phoneText.setText(model.getPhone());;
+        } else {
         // Hiển thị tên người dùng
         holder.usernameText.setText(model.getUsername());
-        // Hiển thị số điện thoại
-        holder.phoneText.setText(model.getPhone());
+        holder.phoneText.setVisibility(View.GONE);
+        }
         // Nếu người dùng là chính mình, thêm "(Me)" vào tên
         if (model.getUserId().equals(FirebaseUtil.currentUserId())) {
             holder.usernameText.setText(model.getUsername() + " (Me)");
